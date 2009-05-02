@@ -1,8 +1,14 @@
 # Use hardware GPS implementation if available.
 #
+
 ifneq ($(BOARD_GPS_LIBRARIES),)
   LOCAL_CFLAGS           += -DHAVE_GPS_HARDWARE
-  LOCAL_SHARED_LIBRARIES += $(BOARD_GPS_LIBRARIES)
+
+  ifneq (, $(filter msm7201a_surf msm7201a_ffa qsd8250_surf qsd8250_ffa, $(TARGET_PRODUCT)))
+  LOCAL_SHARED_LIBRARIES += librpc
+  endif
+
+  LOCAL_SHARED_LIBRARIES += $(BOARD_GPS_LIBRARIES) 
 endif
 
 # Use emulator GPS implementation if QEMU_HARDWARE is set.
