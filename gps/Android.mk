@@ -1,6 +1,5 @@
 # Use hardware GPS implementation if available.
 #
-
 ifneq ($(BOARD_GPS_LIBRARIES),)
   LOCAL_CFLAGS           += -DHAVE_GPS_HARDWARE
 
