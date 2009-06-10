@@ -114,9 +114,17 @@ public:
 
     /**
      * return the frame size (number of bytes per sample).
+     * Change for Codec type
      */
-    uint32_t    frameSize() const { return channelCount()*((format()==AudioSystem::PCM_16_BIT)?sizeof(int16_t):sizeof(int8_t)); }
+    uint32_t    frameSize() const { 
 
+      if (format() == AudioSystem::FORMAT_AMR_IETF)
+      {
+	return channelCount() * 32; // Change for Codec type. Size of one full rate frame.
+      }
+
+      return channelCount()*((format()==AudioSystem::PCM_16_BIT)?sizeof(int16_t):sizeof(int8_t)); 
+    }
     /** set the input gain for the audio driver. This method is for
      *  for future use */
     virtual status_t    setGain(float gain) = 0;
@@ -212,7 +220,8 @@ public:
                                 int channelCount,
                                 uint32_t sampleRate,
                                 status_t *status,
-                                AudioSystem::audio_in_acoustics acoustics) = 0;
+                                AudioSystem::audio_in_acoustics acoustics,
+                                int audiosourcetype) = 0;
 
     /**This method dumps the state of the audio hardware */
     virtual status_t dumpState(int fd, const Vector<String16>& args) = 0;
