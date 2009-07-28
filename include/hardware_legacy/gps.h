@@ -250,7 +250,7 @@ typedef struct {
     /**
      * Sets the IP address and port for the SUPL server.
      */
-    int  (*set_server)( uint32_t addr, int port );
+    int  (*set_server)( const char* hostname, int port );
 } GpsSuplInterface;
 
 /** Returns the hardware GPS interface. */
