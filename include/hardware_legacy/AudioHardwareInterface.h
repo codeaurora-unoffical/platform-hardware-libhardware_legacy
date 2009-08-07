@@ -90,6 +90,11 @@ public:
 
     /** dump the state of the audio output device */
     virtual status_t dump(int fd, const Vector<String16>& args) = 0;
+
+    /**
+     * Function to Open the PCM driver for rendering
+    */
+    virtual status_t   Open() { return 0; }
 };
 
 /**
