@@ -12,12 +12,16 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * 
+ * Copyright (c) 2009, Code Aurora Forum. All rights reserved
+ *
  */
 
 #ifndef _HARDWARE_GPS_H
 #define _HARDWARE_GPS_H
 
 #include <stdint.h>
+#include "hardware_legacy/gps_ni.h"
 
 #if __cplusplus
 extern "C" {
