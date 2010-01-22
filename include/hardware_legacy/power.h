@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +36,10 @@ int release_wake_lock(const char* id);
 
 // true if you want the screen on, false if you want it off
 int set_screen_state(int on);
+
+// 1/true to Activate Unstable Memory Block
+// 0/false to Disable Unstable Memory Block
+int set_unstable_memory_state(int state);
 
 // set how long to stay awake after the last user activity in seconds
 int set_last_user_activity_timeout(int64_t delay);

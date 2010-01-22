@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,6 +30,7 @@
 
 #define LOG_TAG "power"
 #include <utils/Log.h>
+#include <cutils/properties.h>
 
 #include "qemu.h"
 #ifdef QEMU_POWER
@@ -185,5 +187,61 @@ set_screen_state(int on)
     if(len < 0) {
         LOGE("Failed setting last user activity: g_error=%d\n", g_error);
     }
+    return 0;
+}
+
+/************************************
+ If 'state' equals 1
+    Activate Unstable memory
+
+ If 'state' equals 0
+    Disable Unstable memory
+************************************/
+int
+set_unstable_memory_state(int state) {
+    int fd_State=0;
+    char str_movable_start_bytes[PROPERTY_VALUE_MAX], str_block[32]="0";
+    char pDirName[128]="/sys/devices/system/memory/memory", fDirName[128], strState[7]="/state";
+
+    LOGW("UnstableMemory(%d)", state);
+
+    if(property_get("ro.dev.dmm.dpd.start_address", str_movable_start_bytes, "0") <= 0) {
+        LOGE("Failed to property_get() movable start bytes:%s\n",str_movable_start_bytes);
+        return -1;
+    }
+    else
+        LOGI("str_movable_start_bytes = %s\n", str_movable_start_bytes);
+
+     if(property_get("ro.dev.dmm.dpd.block", str_block, "0") <= 0) {
+        LOGE("Failed to property_get() block number:%s\n",str_block);
+        return -1;
+    }
+    else
+        LOGI("str_block = %s\n", str_block);
+
+    sprintf(fDirName, "%s%s%s", pDirName, str_block, strState);
+
+    LOGI("Directory Location = %s\n", fDirName);
+
+    if((fd_State=open(fDirName, O_RDWR)) < 0) {
+        LOGE("Failed to open %s: %d", fDirName, -errno);
+        return -1;
+    }
+
+    if(state == 0) {
+        if(write(fd_State, "offline", strlen("offline")) < strlen("offline")) {
+            LOGE("Disabling unstable memory: Failed !");
+            close(fd_State);
+            return -1;
+        }
+    }
+    else {
+        if(write(fd_State, "online", strlen("online")) < strlen("online")) {
+            LOGE("Activating unstable memory: Failed !");
+            close(fd_State);
+            return -1;
+        }
+    }
+    close(fd_State);
     return 0;
 }
