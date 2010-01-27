@@ -226,6 +226,13 @@ public:
                                 uint32_t *channels=0,
                                 uint32_t *sampleRate=0,
                                 status_t *status=0) = 0;
+    /** This method creates and opens the audio hardware output
+     *  stream for tunnel audio decoding */
+    virtual AudioStreamOut* openOutputSession(
+                                uint32_t devices,
+                                int *format=0,
+                                status_t *status=0,
+                                int sessionId=-1) {return 0;};
     virtual    void        closeOutputStream(AudioStreamOut* out) = 0;
     /** This method creates and opens the audio hardware input stream */
     virtual AudioStreamIn* openInputStream(
