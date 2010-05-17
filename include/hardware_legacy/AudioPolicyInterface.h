@@ -163,6 +163,7 @@ public:
     virtual audio_io_handle_t openSession(uint32_t *pDevices,
                                     uint32_t *pFormat,
                                     AudioSystem::output_flags flags,
+                                    int32_t  streamType,
                                     int32_t  sessionId) {return 0;};
     // closes the output audio session. 
     virtual status_t closeSession(audio_io_handle_t output) {return 0;};
