@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +36,17 @@ int release_wake_lock(const char* id);
 
 // true if you want the screen on, false if you want it off
 int set_screen_state(int on);
+
+int write_to_active(char str_hex_start_bytes[32]);
+int write_to_low_power(char str_hex_start_bytes[32]);
+
+// 1/true to set EBI-1 to Deep Power Down
+// 0/false to set EBI-1 to Active
+int set_ebi1_to_dpd(int on);
+
+// 1/true to set EBI-1 to Self Refresh
+// 0/false to set EBI-1 to Active
+int set_ebi1_to_sr(int on);
 
 // set how long to stay awake after the last user activity in seconds
 int set_last_user_activity_timeout(int64_t delay);
