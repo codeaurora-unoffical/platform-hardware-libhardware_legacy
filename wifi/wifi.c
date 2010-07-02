@@ -1,5 +1,6 @@
 /*
  * Copyright 2008, The Android Open Source Project
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,6 +93,98 @@ static const char SUPP_CONFIG_FILE[]    = "/data/misc/wifi/wpa_supplicant.conf";
 static const char MODULE_FILE[]         = "/proc/modules";
 static const char SDIO_POLLING_ON[]     = "/etc/init.qcom.sdio.sh 1";
 static const char SDIO_POLLING_OFF[]    = "/etc/init.qcom.sdio.sh 0";
+static const char LOCK_FILE[]           = "/data/misc/wifi/drvr_ld_lck_pid";
+
+static int _wifi_unload_driver();   /* Does not check Bluetooth status */
+
+#define MAX_LOCK_TRY    20
+
+static int lock(void)
+{
+    int fd;
+    int i = MAX_LOCK_TRY;
+    char pid_buf[11];   /* Holds a 32-bit decimal pid */
+
+    while (((fd = open(LOCK_FILE, O_EXCL | O_CREAT | O_RDWR, 0666)) < 0)
+            && (i > 0)) {
+
+        LOGV("lock file excl open error: %s; cnt: %d", strerror(errno), i);
+        if (errno != EEXIST) {
+            LOGE("Can't create lock file: %s", strerror(errno));
+            break;
+        } else {
+            /* After first try, check if the owner exists; delete file if not */
+            if (i == MAX_LOCK_TRY) {
+                fd = open(LOCK_FILE, O_RDONLY, 0);
+                if (fd < 0) {
+                    if (errno == ENOENT) {
+                        LOGV("Lock file is gone now");
+                    } else {
+                        LOGW("Can't open lock file: %s", strerror(errno));
+                    }
+                } else {
+                    int pid_len;
+
+                    pid_len = read(fd, pid_buf, sizeof(pid_buf));
+                    close(fd);
+                    fd = -1;
+                    if (pid_len > 0) {
+                        int pid;
+
+                        pid = atoi(pid_buf);
+                        if ((pid == getpid()) || /* Owner should not be me */
+                                ((pid > 0) && (kill((pid_t)pid, 0) < 0) &&
+                                 (errno == ESRCH))) {
+                            LOGV("Deleting old lock file, was owned by %d", pid);
+                            if (unlink(LOCK_FILE) < 0) {
+                                LOGE("Can't delete old lock file, was owned by %d: %s",
+                                     pid, strerror(errno));
+                            }
+                        } else {
+                            LOGV("Lock file seems to be owned by %d", pid);
+                        }
+                    } else {
+                        LOGE("Can't read pid in lock file, deleting it! Len = %d. %s",
+                             pid_len, (pid_len < 0) ? strerror(errno) : "");
+                        if (unlink(LOCK_FILE) < 0) {
+                            LOGE("Can't delete existing lock file: %s",
+                                 strerror(errno));
+                        }
+                    }
+                }
+            }
+        }
+        usleep(500000);
+        i--;
+    }
+
+    if (i > 0) {
+        snprintf(pid_buf, sizeof(pid_buf), "%d", getpid());
+        pid_buf[sizeof(pid_buf)-1] = 0;
+        if (write(fd, pid_buf, strlen(pid_buf)) < 0) {
+            LOGE("Can't write to lock file: %s", strerror(errno));
+            close(fd);
+            fd = -1;
+        } else {
+            LOGV("Lock obtained");
+        }
+    } else {
+        LOGE("Can't obtain lock: %s", strerror(errno));
+    }
+
+    return fd;
+}
+
+static void unlock(int fd)
+{
+    if (fd >= 0) {
+        close(fd);
+        if (unlink(LOCK_FILE) < 0) {
+            LOGE("Unlock unlink error: %s", strerror(errno));
+        }
+        else LOGI("Lock released");
+    }
+}
 
 static int insmod(const char *filename, const char *args)
 {
@@ -105,6 +198,11 @@ static int insmod(const char *filename, const char *args)
 
     ret = init_module(module, size, args);
 
+    if ((ret < 0) && (errno == EEXIST)) {
+        LOGV("init_module: %s is already loaded", filename);
+        ret = 0;
+    }
+
     free(module);
 
     return ret;
@@ -117,8 +215,14 @@ static int rmmod(const char *modname)
 
     while (maxtry-- > 0) {
         ret = delete_module(modname, O_NONBLOCK | O_EXCL);
-        if (ret < 0 && errno == EAGAIN)
+        if ((ret < 0) && (errno == EAGAIN || errno == EBUSY)) {
             usleep(500000);
+        }
+        else if ((ret < 0) && (errno == ENOENT)) {
+            LOGV("delete_module: %s is already unloaded", modname);
+            ret = 0;
+            break;
+        }
         else
             break;
     }
@@ -187,8 +291,13 @@ int wifi_load_driver()
     char driver_status[PROPERTY_VALUE_MAX];
     int count = 100; /* wait at most 20 seconds for completion */
     int status = -1;
+    int lock_id;
+
+    if ((lock_id = lock()) < 0)
+        return -1;
 
     if (check_driver_loaded()) {
+        unlock(lock_id);
         return 0;
     }
 
@@ -220,21 +329,46 @@ int wifi_load_driver()
                 goto end;
             }
             else if (strcmp(driver_status, "failed") == 0) {
-                wifi_unload_driver();
+                _wifi_unload_driver();
                 goto end;
             }
         }
         usleep(200000);
     }
     property_set(DRIVER_PROP_NAME, "timeout");
-    wifi_unload_driver();
+    _wifi_unload_driver();
 
 end:
     system(SDIO_POLLING_OFF);
+    unlock(lock_id);
     return status;
 }
 
 int wifi_unload_driver()
+{
+    char bt_status[PROPERTY_VALUE_MAX];
+    int lock_id;
+    int status;
+
+    if (property_get("ro.config.bt.amp", bt_status, NULL)
+            && (strcmp(bt_status, "yes") == 0)) {
+
+        if (property_get("init.svc.bluetoothd", bt_status, NULL)
+                && (strcmp(bt_status, "running") == 0)) {
+            LOGV("Bluetooth is on; keep WiFi driver loaded for AMP PAL");
+            return(0);
+        }
+    }
+
+    /* Ignores possible lock failure, try to unload anyway */
+    lock_id = lock();
+    status = _wifi_unload_driver();
+    unlock(lock_id);
+
+    return status;
+}
+
+static int _wifi_unload_driver()
 {
     int count = 20; /* wait at most 10 seconds for completion */
     char driver_status[PROPERTY_VALUE_MAX];
