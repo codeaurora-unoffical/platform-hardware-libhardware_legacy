@@ -95,6 +95,10 @@ public:
                                         uint32_t format = AudioSystem::FORMAT_DEFAULT,
                                         AudioSystem::output_flags flags = AudioSystem::OUTPUT_FLAG_DIRECT,
                                         int32_t  sessionId=-1) {return 0;};
+    // requests to pause an ongoing tunnel mode/ batch decode session.
+    virtual void pauseSession(audio_io_handle_t output, AudioSystem::stream_type stream) {return;};
+    // requests to resume an ongoing tunnel mode/ batch decode session.
+    virtual void resumeSession(audio_io_handle_t output, AudioSystem::stream_type stream) {return;};
     // requests to release an ongoing tunnel mode/ batch decode session.
     virtual void releaseSession(audio_io_handle_t output) {return;};
     // indicates to the audio policy manager that the output starts being used by corresponding stream.
