@@ -164,9 +164,6 @@ int
 set_screen_state(int on)
 {
     QEMU_FALLBACK(set_screen_state(on));
-#if defined(DUMMY_WAKE_LOCKS)
-    return 0;
-#endif
 
     LOGI("*** set_screen_state %d", on);
 
