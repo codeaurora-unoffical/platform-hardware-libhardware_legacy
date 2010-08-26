@@ -192,6 +192,8 @@ int wifi_load_driver()
         return 0;
     }
 
+    property_set(DRIVER_PROP_NAME, "loading");
+
     if(system(SDIO_POLLING_ON))
         LOGW("Couldn't turn on SDIO polling: %s", SDIO_POLLING_ON);
 
