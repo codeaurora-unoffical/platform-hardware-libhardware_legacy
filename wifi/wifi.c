@@ -98,6 +98,7 @@ static const char LOCK_FILE[]           = "/data/misc/wifi/drvr_ld_lck_pid";
 static int _wifi_unload_driver();   /* Does not check Bluetooth status */
 
 #define MAX_LOCK_TRY    20
+#define LOCK_TRY_LAST_CHANCE    2
 
 static int lock(void)
 {
@@ -114,7 +115,7 @@ static int lock(void)
             break;
         } else {
             /* After first try, check if the owner exists; delete file if not */
-            if (i == MAX_LOCK_TRY) {
+            if ((i == MAX_LOCK_TRY) || i == LOCK_TRY_LAST_CHANCE) {
                 fd = open(LOCK_FILE, O_RDONLY, 0);
                 if (fd < 0) {
                     if (errno == ENOENT) {
@@ -142,6 +143,12 @@ static int lock(void)
                             }
                         } else {
                             LOGV("Lock file seems to be owned by %d", pid);
+                            if (i == LOCK_TRY_LAST_CHANCE) {
+                                LOGV("Deleting lock file; owner stuck or file stale");
+                                if (unlink(LOCK_FILE) < 0) {
+                                    LOGE("Can't delete old lock file: %s", strerror(errno));
+                                }
+                            }
                         }
                     } else {
                         LOGE("Can't read pid in lock file, deleting it! Len = %d. %s",
