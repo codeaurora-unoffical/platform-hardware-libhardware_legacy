@@ -97,29 +97,37 @@ static const char LOCK_FILE[]           = "/data/misc/wifi/drvr_ld_lck_pid";
 
 static int _wifi_unload_driver();   /* Does not check Bluetooth status */
 
-#define MAX_LOCK_TRY    20
+#define MAX_LOCK_TRY    14
 #define LOCK_TRY_LAST_CHANCE    2
 
 static int lock(void)
 {
     int fd;
     int i = MAX_LOCK_TRY;
-    char pid_buf[11];   /* Holds a 32-bit decimal pid */
+    char pid_buf[12];   /* 32-bit decimal pid, \n, \0 */
+    int sleep_time;
+    int first_pid = -1;
 
     while (((fd = open(LOCK_FILE, O_EXCL | O_CREAT | O_RDWR, 0666)) < 0)
             && (i > 0)) {
 
         LOGV("lock file excl open error: %s; cnt: %d", strerror(errno), i);
+        sleep_time = 500000;    /* Time till try again (usec) */
         if (errno != EEXIST) {
             LOGE("Can't create lock file: %s", strerror(errno));
             break;
         } else {
-            /* After first try, check if the owner exists; delete file if not */
+            /* After first try, check if the owner exists; delete file if not.
+             * If owner does exist, check on last try if owner is still the same
+             * and delete file if so (due to stale file or owner is stuck).
+             * Else, give the new owner a chance.
+             */
             if ((i == MAX_LOCK_TRY) || i == LOCK_TRY_LAST_CHANCE) {
                 fd = open(LOCK_FILE, O_RDONLY, 0);
                 if (fd < 0) {
                     if (errno == ENOENT) {
                         LOGV("Lock file is gone now");
+                        sleep_time = 0;
                     } else {
                         LOGW("Can't open lock file: %s", strerror(errno));
                     }
@@ -131,9 +139,17 @@ static int lock(void)
                     fd = -1;
                     if (pid_len > 0) {
                         int pid;
+                        char* end;
 
-                        pid = atoi(pid_buf);
+                        /* Accepted format is <whitespaces><digits>\n */
+                        pid = (int) strtol(pid_buf, &end, 10);
+
+                        if ((end == NULL) || (end <= pid_buf) || (*end != '\n')) {
+                            LOGV("strtol error: Can't parse owner pid");
+                            pid = 0;
+                        }
                         if ((pid == getpid()) || /* Owner should not be me */
+                                ((pid <= 0)) || /* Invalid pid */
                                 ((pid > 0) && (kill((pid_t)pid, 0) < 0) &&
                                  (errno == ESRCH))) {
                             LOGV("Deleting old lock file, was owned by %d", pid);
@@ -141,13 +157,21 @@ static int lock(void)
                                 LOGE("Can't delete old lock file, was owned by %d: %s",
                                      pid, strerror(errno));
                             }
+                            sleep_time = 0;
                         } else {
-                            LOGV("Lock file seems to be owned by %d", pid);
+                            LOGV("Lock file %s owned by %d",
+                                    (first_pid == pid) ? "still" : "is", pid);
+                            if (first_pid != pid) {
+                                /* Wait a fresh set of tries and save the current owner */
+                                i = MAX_LOCK_TRY;
+                                first_pid = pid;
+                            }
                             if (i == LOCK_TRY_LAST_CHANCE) {
                                 LOGV("Deleting lock file; owner stuck or file stale");
                                 if (unlink(LOCK_FILE) < 0) {
                                     LOGE("Can't delete old lock file: %s", strerror(errno));
                                 }
+                                sleep_time = 0;
                             }
                         }
                     } else {
@@ -157,18 +181,22 @@ static int lock(void)
                             LOGE("Can't delete existing lock file: %s",
                                  strerror(errno));
                         }
+                        sleep_time = 0;
                     }
                 }
             }
         }
-        usleep(500000);
+        if (sleep_time) {
+            LOGV("Sleeping.");
+            usleep(sleep_time);
+        }
         i--;
     }
 
     if (i > 0) {
-        snprintf(pid_buf, sizeof(pid_buf), "%d", getpid());
-        pid_buf[sizeof(pid_buf)-1] = 0;
-        if (write(fd, pid_buf, strlen(pid_buf)) < 0) {
+        snprintf(pid_buf, sizeof(pid_buf), "%10d\n", getpid());
+        LOGV("Writing pid_buf: %s", (char *)pid_buf);
+        if (write(fd, pid_buf, sizeof(pid_buf)-1) < 0) {
             LOGE("Can't write to lock file: %s", strerror(errno));
             close(fd);
             fd = -1;
