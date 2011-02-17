@@ -230,7 +230,7 @@ protected:
         // Mute or unmute all streams handled by the specified strategy on the specified output
         void setStrategyMute(routing_strategy strategy, bool on, audio_io_handle_t output, int delayMs = 0);
         // Mute or unmute the stream on the specified output
-        void setStreamMute(int stream, bool on, audio_io_handle_t output, int delayMs = 0);
+        virtual void setStreamMute(int stream, bool on, audio_io_handle_t output, int delayMs = 0);
         // handle special cases for sonification strategy while in call: mute streams or replace by
         // a special tone in the device used for communication
         void handleIncallSonification(int stream, bool starting, bool stateChange);
