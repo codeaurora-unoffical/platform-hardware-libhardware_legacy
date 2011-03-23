@@ -382,12 +382,6 @@ int wifi_start_supplicant()
         if (pi != NULL) {
             __system_property_read(pi, NULL, supp_status);
             if (strcmp(supp_status, "running") == 0) {
-		/*
-		 * Delay is added to make sure driver is initialized
-		 * before Wifi Monitor is trying to attach to
-		 * supplicant
-		 */
-		usleep(2000000);
                 return 0;
             } else if (pi->serial != serial &&
                     strcmp(supp_status, "stopped") == 0) {
