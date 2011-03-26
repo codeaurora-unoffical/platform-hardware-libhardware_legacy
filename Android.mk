@@ -3,6 +3,11 @@
 # Setting LOCAL_PATH will mess up all-subdir-makefiles, so do it beforehand.
 SAVE_MAKEFILES := $(call all-subdir-makefiles)
 
+PWR_CFLAGS :=
+ifeq "$(findstring msm8660,$(QCOM_TARGET_PRODUCT))" "msm8660"
+  PWR_CFLAGS += -DUSE_CPUMAX_CONTROL
+endif
+
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
@@ -28,6 +33,8 @@ ifeq ($(TARGET_SIMULATOR),true)
 	endif
 endif
 
+LOCAL_CFLAGS += $(PWR_CFLAGS)
+
 LOCAL_MODULE:= libhardware_legacy
 
 include $(BUILD_SHARED_LIBRARY)
@@ -36,6 +43,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE:= libpower
+LOCAL_CFLAGS += $(PWR_CFLAGS)
 
 LOCAL_SRC_FILES += power/power.c
 

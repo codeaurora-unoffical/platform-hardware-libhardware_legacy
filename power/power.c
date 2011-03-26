@@ -35,6 +35,15 @@
 #include "power_qemu.h"
 #endif
 
+
+#ifdef USE_CPUMAX_CONTROL
+#include "cutils/properties.h"
+
+#define MPDECISION_SERVICE "mpdecision"
+#define MFREQ_FILE "/sys/devices/system/cpu/mfreq"
+#define ONLINE_FILE "/sys/devices/system/cpu/cpu1/online"
+#endif
+
 enum {
     ACQUIRE_PARTIAL_WAKE_LOCK = 0,
     RELEASE_WAKE_LOCK,
@@ -202,17 +211,45 @@ initialize_cpu_min_max(void)
 int
 acquire_cpu_max_lock()
 {
+#ifdef USE_CPUMAX_CONTROL
+    int fd;
+
+    property_set("ctl.stop", MPDECISION_SERVICE);
+    fd = open(ONLINE_FILE, O_WRONLY);
+    if (fd >= 0) {
+        write(fd, "1", 1);
+        close(fd);
+    }
+    fd = open(MFREQ_FILE, O_WRONLY);
+    if (fd >= 0) {
+        write(fd, "1", 1);
+        close(fd);
+    }
+    return 1;
+#else
     initialize_cpu_fds();
     if (cpu_fds_error) return cpu_fds_error;
     initialize_cpu_min_max();
 
     return write(cpu_fds[CPU_SCALING_MIN_FREQ],
                 cpu_scaling_max_freq_default, CPU_FREQ_MAX_SIZE);
+#endif
 }
 
 int
 release_cpu_max_lock()
 {
+#ifdef USE_CPUMAX_CONTROL
+    int fd;
+
+    property_set("ctl.start", MPDECISION_SERVICE);
+    fd = open(MFREQ_FILE, O_WRONLY);
+    if (fd >= 0) {
+        write(fd, "0", 1);
+        close(fd);
+    }
+    return 1;
+#else
     initialize_cpu_fds();
     if (cpu_fds_error) return cpu_fds_error;
 
@@ -220,6 +257,7 @@ release_cpu_max_lock()
 
     return write(cpu_fds[CPU_SCALING_MIN_FREQ],
                 cpu_scaling_min_freq_default, CPU_FREQ_MAX_SIZE);
+#endif
 }
 
 
