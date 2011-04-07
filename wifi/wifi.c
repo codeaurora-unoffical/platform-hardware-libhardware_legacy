@@ -290,9 +290,17 @@ int ensure_config_file_exists()
     char buf[2048];
     int srcfd, destfd;
     int nread;
+    struct stat st;
 
     if (access(SUPP_CONFIG_FILE, R_OK|W_OK) == 0) {
-        return 0;
+        if( stat( SUPP_CONFIG_FILE, &st ) < 0 ) {
+          LOGE("Cannot stat the file \"%s\": %s", SUPP_CONFIG_FILE, strerror(errno));
+          return -1;
+        }
+        //check if config file has some data or is it empty due to previous errors
+        if( st.st_size )
+          return 0;
+        //else continue to write the config from default template.
     } else if (errno != ENOENT) {
         LOGE("Cannot access \"%s\": %s", SUPP_CONFIG_FILE, strerror(errno));
         return -1;
