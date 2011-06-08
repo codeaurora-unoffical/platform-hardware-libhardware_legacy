@@ -60,15 +60,20 @@ static char iface[PROPERTY_VALUE_MAX];
 #define WIFI_DRIVER_MODULE_NAME         "wlan"
 #endif
 #ifndef WIFI_SDIO_IF_DRIVER_MODULE_PATH
-#define WIFI_SDIO_IF_DRIVER_MODULE_PATH         "/system/lib/modules/librasdioif.ko"
+#define WIFI_SDIO_IF_DRIVER_MODULE_PATH         ""
 #endif
 #ifndef WIFI_SDIO_IF_DRIVER_MODULE_NAME
-#define WIFI_SDIO_IF_DRIVER_MODULE_NAME "librasdioif"
+#define WIFI_SDIO_IF_DRIVER_MODULE_NAME ""
 #endif
 #ifndef WIFI_DRIVER_MODULE_ARG
 #define WIFI_SDIO_IF_DRIVER_MODULE_ARG  ""
 #define WIFI_DRIVER_MODULE_ARG          ""
 #endif
+
+#ifndef WIFI_SDIO_IF_DRIVER_MODULE_ARG
+#define WIFI_SDIO_IF_DRIVER_MODULE_ARG  ""
+#endif
+
 #ifndef WIFI_FIRMWARE_LOADER
 #define WIFI_FIRMWARE_LOADER		""
 #endif
@@ -341,11 +346,16 @@ int wifi_load_driver()
     if(system(SDIO_POLLING_ON))
         LOGW("Couldn't turn on SDIO polling: %s", SDIO_POLLING_ON);
 
-    if (insmod(DRIVER_SDIO_IF_MODULE_PATH, DRIVER_SDIO_IF_MODULE_ARG) < 0)
-        goto end;
+    if ('\0' != *DRIVER_SDIO_IF_MODULE_PATH) {
+       if (insmod(DRIVER_SDIO_IF_MODULE_PATH, DRIVER_SDIO_IF_MODULE_ARG) < 0) {
+           goto end;
+       }
+    }
 
     if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
-        rmmod(DRIVER_SDIO_IF_MODULE_NAME);
+        if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
+           rmmod(DRIVER_SDIO_IF_MODULE_NAME);
+        }
         goto end;
     }
 
