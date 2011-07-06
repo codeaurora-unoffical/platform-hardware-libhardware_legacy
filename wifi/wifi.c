@@ -537,10 +537,14 @@ static int _wifi_unload_driver()
                 wrq.u.data.length = 0; /* No Set arguments */
                 wrq.u.mode = 5; /* WE_MODULE_DOWN_IND sub-command */
                 ret = ioctl(s, (SIOCIWFIRSTPRIV + 1), &wrq);
-                close(s);
                 if (ret < 0 ) {
-                    LOGE("ioctl failed: %s", strerror(errno));
+                    strncpy(wrq.ifr_name, "softap.0", IFNAMSIZ);
+                    ret = ioctl(s, (SIOCIWFIRSTPRIV + 1), &wrq);
+                    if (ret < 0 ) {
+                       LOGE("ioctl failed: %s", strerror(errno));
+                    }
                 }
+                close(s);
                 sched_yield();
             }
             else {
