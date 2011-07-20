@@ -53,6 +53,28 @@ static char iface[PROPERTY_VALUE_MAX];
 // TODO: use new ANDROID_SOCKET mechanism, once support for multiple
 // sockets is in
 
+
+#ifdef ATH_WIFI
+
+#ifndef WIFI_DRIVER_MODULE_PATH
+#define WIFI_DRIVER_MODULE_PATH         "" /* use wlan_tool to load module */
+#endif
+#ifndef WIFI_DRIVER_MODULE_NAME
+#define WIFI_DRIVER_MODULE_NAME         "ar6000"
+#endif
+#ifndef WIFI_FIRMWARE_LOADER
+#define WIFI_FIRMWARE_LOADER            "wlan_tool"
+#endif
+#define WIFI_DEF_IFNAME                 "wlan0"
+static const char IFACE_DIR[]           = "/data/system/wpa_supplicant";
+static const char LOADER_PROP_NAME[]    = "init.svc.wlan_tool";
+#define NUM_50_MILLISECONDS               50000
+#define NUM_50_MILLISECONDS_IN_16_SECONDS 320
+#define NUM_50_MILLISECONDS_IN_8_SECONDS  160
+#define NUM_50_MILLISECONDS_IN_5_SECONDS  100
+
+#else
+
 #ifndef WIFI_DRIVER_MODULE_PATH
 #define WIFI_DRIVER_MODULE_PATH         "/system/lib/modules/wlan.ko"
 #endif
@@ -63,47 +85,47 @@ static char iface[PROPERTY_VALUE_MAX];
 #define WIFI_SDIO_IF_DRIVER_MODULE_PATH         ""
 #endif
 #ifndef WIFI_SDIO_IF_DRIVER_MODULE_NAME
-#define WIFI_SDIO_IF_DRIVER_MODULE_NAME ""
+#define WIFI_SDIO_IF_DRIVER_MODULE_NAME         ""
 #endif
-#ifndef WIFI_DRIVER_MODULE_ARG
-#define WIFI_SDIO_IF_DRIVER_MODULE_ARG  ""
-#define WIFI_DRIVER_MODULE_ARG          ""
-#endif
-
-#ifndef WIFI_SDIO_IF_DRIVER_MODULE_ARG
-#define WIFI_SDIO_IF_DRIVER_MODULE_ARG  ""
-#endif
-
 #ifndef WIFI_FIRMWARE_LOADER
-#define WIFI_FIRMWARE_LOADER		""
+#define WIFI_FIRMWARE_LOADER                    ""
 #endif
-#define WIFI_TEST_INTERFACE		"sta"
-
-#define WIFI_DRIVER_LOADER_DELAY	1000000
-
+#ifndef WIFI_SDIO_IF_DRIVER_MODULE_ARG
+#define WIFI_SDIO_IF_DRIVER_MODULE_ARG          ""
+#endif
+#define WIFI_TEST_INTERFACE                     "sta"
+#define MAX_LOCK_TRY                    14
+#define LOCK_TRY_LAST_CHANCE            2
 static const char IFACE_DIR[]           = "/data/misc/wifi/wpa_supplicant";
-static const char DRIVER_MODULE_NAME[]  = WIFI_DRIVER_MODULE_NAME;
+static const char SDIO_POLLING_ON[]     = "/etc/init.qcom.sdio.sh 1";
+static const char SDIO_POLLING_OFF[]    = "/etc/init.qcom.sdio.sh 0";
+static const char LOCK_FILE[]           = "/data/misc/wifi/drvr_ld_lck_pid";
+static int _wifi_unload_driver();   /* Does not check Bluetooth status */
 static const char DRIVER_SDIO_IF_MODULE_NAME[]  = WIFI_SDIO_IF_DRIVER_MODULE_NAME;
-static const char DRIVER_MODULE_TAG[]   = WIFI_DRIVER_MODULE_NAME " ";
-static const char DRIVER_MODULE_PATH[]  = WIFI_DRIVER_MODULE_PATH;
 static const char DRIVER_SDIO_IF_MODULE_PATH[]  = WIFI_SDIO_IF_DRIVER_MODULE_PATH;
-static const char DRIVER_MODULE_ARG[]   = WIFI_DRIVER_MODULE_ARG;
 static const char DRIVER_SDIO_IF_MODULE_ARG[]   = WIFI_SDIO_IF_DRIVER_MODULE_ARG;
-static const char FIRMWARE_LOADER[]     = WIFI_FIRMWARE_LOADER;
+
+#endif
+
+#ifndef WIFI_DRIVER_MODULE_ARG
+#define WIFI_DRIVER_MODULE_ARG                  ""
+#endif
+
+#define WIFI_DRIVER_LOADER_DELAY                1000000
 static const char DRIVER_PROP_NAME[]    = "wlan.driver.status";
 static const char SUPPLICANT_NAME[]     = "wpa_supplicant";
 static const char SUPP_PROP_NAME[]      = "init.svc.wpa_supplicant";
 static const char SUPP_CONFIG_TEMPLATE[]= "/system/etc/wifi/wpa_supplicant.conf";
 static const char SUPP_CONFIG_FILE[]    = "/data/misc/wifi/wpa_supplicant.conf";
 static const char MODULE_FILE[]         = "/proc/modules";
-static const char SDIO_POLLING_ON[]     = "/etc/init.qcom.sdio.sh 1";
-static const char SDIO_POLLING_OFF[]    = "/etc/init.qcom.sdio.sh 0";
-static const char LOCK_FILE[]           = "/data/misc/wifi/drvr_ld_lck_pid";
 
-static int _wifi_unload_driver();   /* Does not check Bluetooth status */
+static const char DRIVER_MODULE_NAME[]          = WIFI_DRIVER_MODULE_NAME;
+static const char DRIVER_MODULE_TAG[]           = WIFI_DRIVER_MODULE_NAME " ";
+static const char DRIVER_MODULE_PATH[]          = WIFI_DRIVER_MODULE_PATH;
+static const char DRIVER_MODULE_ARG[]           = WIFI_DRIVER_MODULE_ARG;
+static const char FIRMWARE_LOADER[]             = WIFI_FIRMWARE_LOADER;
 
-#define MAX_LOCK_TRY    14
-#define LOCK_TRY_LAST_CHANCE    2
+#ifndef ATH_WIFI
 
 static int lock(void)
 {
@@ -226,6 +248,7 @@ static void unlock(int fd)
     }
 }
 
+#endif
 static int insmod(const char *filename, const char *args)
 {
     void *module;
@@ -276,7 +299,11 @@ static int rmmod(const char *modname)
 int do_dhcp_request(int *ipaddr, int *gateway, int *mask,
                     int *dns1, int *dns2, int *server, int *lease) {
     /* For test driver, always report success */
+#ifdef ATH_WIFI
+    if (strncmp(iface, WIFI_DEF_IFNAME, strlen(WIFI_DEF_IFNAME)) == 0)
+#else
     if (strcmp(iface, WIFI_TEST_INTERFACE) == 0)
+#endif
         return 0;
 
     if (ifc_init() < 0)
@@ -328,6 +355,47 @@ static int check_driver_loaded() {
 
 int wifi_load_driver()
 {
+#ifdef ATH_WIFI
+    char driver_status[PROPERTY_VALUE_MAX];
+    int count = NUM_50_MILLISECONDS_IN_16_SECONDS;
+
+    if (check_driver_loaded()) {
+        return 0;
+    }
+
+    while (count-- > 0) {
+       char loader_status[PROPERTY_VALUE_MAX];
+       if (!property_get(LOADER_PROP_NAME, loader_status, NULL)
+                || strcmp(loader_status, "running") != 0) {
+            break;
+       }
+       usleep(NUM_50_MILLISECONDS);
+    }
+    LOGE("+ Loading driver");
+    if (strcmp(FIRMWARE_LOADER,"") == 0) {
+        usleep(WIFI_DRIVER_LOADER_DELAY);
+        property_set(DRIVER_PROP_NAME, "ok");
+    }
+    else {
+        property_set("ctl.start", WIFI_FIRMWARE_LOADER ":load");
+    }
+    sched_yield();
+    while (count-- > 0) {
+        if (property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
+            if (strcmp(driver_status, "ok") == 0)
+                return 0;
+            else if (strcmp(driver_status, "failed") == 0) {
+                wifi_unload_driver();
+                return -1;
+            }
+        }
+        usleep(NUM_50_MILLISECONDS);
+    }
+    property_set(DRIVER_PROP_NAME, "timeout");
+    wifi_unload_driver();
+    return -1;
+#else
+
     char driver_status[PROPERTY_VALUE_MAX];
     int count = 100; /* wait at most 20 seconds for completion */
     int status = -1;
@@ -387,10 +455,41 @@ end:
     system(SDIO_POLLING_OFF);
     unlock(lock_id);
     return status;
+#endif
 }
 
 int wifi_unload_driver()
 {
+#ifdef ATH_WIFI
+    int count = 100; /* wait at most 5 seconds for completion */
+    int status = -1;
+
+    while (count-- > 0) {
+       char loader_status[PROPERTY_VALUE_MAX];
+       if (!property_get(LOADER_PROP_NAME, loader_status, NULL)
+                || strcmp(loader_status, "running") != 0) {
+            break;
+       }
+       usleep(NUM_50_MILLISECONDS);
+    }
+
+
+    if (property_set("ctl.start", WIFI_FIRMWARE_LOADER ":unload") == 0) {
+        char driver_status[PROPERTY_VALUE_MAX];
+        sched_yield();
+        while (count-- > 0) {
+            if (property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
+                if (strcmp(driver_status, "unloaded") == 0) {
+                    status = 0;
+                    break;
+                }
+            }
+            usleep(NUM_50_MILLISECONDS);
+        }
+    }
+    return status;
+#else
+
     char bt_status[PROPERTY_VALUE_MAX];
     int lock_id;
     int status;
@@ -411,8 +510,10 @@ int wifi_unload_driver()
     unlock(lock_id);
 
     return status;
+#endif
 }
 
+#ifndef ATH_WIFI
 static int _wifi_unload_driver()
 {
     int count = 20; /* wait at most 10 seconds for completion */
@@ -463,6 +564,7 @@ static int _wifi_unload_driver()
     else
         return -1;
 }
+#endif
 
 int ensure_config_file_exists()
 {
@@ -622,6 +724,25 @@ int wifi_connect_to_supplicant()
         return -1;
     }
 
+#ifdef ATH_WIFI
+    property_get("wifi.interface", iface, WIFI_DEF_IFNAME);
+
+    snprintf(ifname, sizeof(ifname), "%s/%s", IFACE_DIR, iface);
+    LOGD("ifname = %s\n", ifname);
+
+    { /* check iface file is ready */
+        int cnt = NUM_50_MILLISECONDS_IN_8_SECONDS;
+        sched_yield();
+        while ( access(ifname, F_OK|W_OK)!=0 && cnt-- > 0) {
+            usleep(NUM_50_MILLISECONDS);
+        }
+        if (access(ifname, F_OK|W_OK)==0) {
+            LOGD("ifname %s is ready to read/write cnt=%d\n", ifname, cnt);
+        } else {
+            LOGD("ifname %s is not ready, cnt=%d\n", ifname, cnt);
+        }
+    }
+#else
     property_get("wifi.interface", iface, WIFI_TEST_INTERFACE);
 
     if (access(IFACE_DIR, F_OK) == 0) {
@@ -629,6 +750,8 @@ int wifi_connect_to_supplicant()
     } else {
         strlcpy(ifname, iface, sizeof(ifname));
     }
+
+#endif
 
     ctrl_conn = wpa_ctrl_open(ifname);
     if (ctrl_conn == NULL) {
