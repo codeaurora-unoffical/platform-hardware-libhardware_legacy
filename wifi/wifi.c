@@ -113,7 +113,6 @@ static const char DRIVER_SDIO_IF_MODULE_ARG[]   = WIFI_SDIO_IF_DRIVER_MODULE_ARG
 #define WIFI_DRIVER_MODULE_ARG                  ""
 #endif
 
-#define WIFI_DRIVER_LOADER_DELAY                1000000
 static const char DRIVER_PROP_NAME[]    = "wlan.driver.status";
 static const char SUPPLICANT_NAME[]     = "wpa_supplicant";
 static const char SUPP_PROP_NAME[]      = "init.svc.wpa_supplicant";
@@ -375,7 +374,6 @@ int wifi_load_driver()
     }
     LOGE("+ Loading driver");
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
-        usleep(WIFI_DRIVER_LOADER_DELAY);
         property_set(DRIVER_PROP_NAME, "ok");
     }
     else {
@@ -430,7 +428,6 @@ int wifi_load_driver()
     }
 
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
-        usleep(WIFI_DRIVER_LOADER_DELAY);
         property_set(DRIVER_PROP_NAME, "ok");
     }
     else {
