@@ -519,7 +519,12 @@ int wifi_start_supplicant()
     char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
     int count = 200; /* wait at most 20 seconds for completion */
 #ifdef HAVE_LIBC_SYSTEM_PROPERTIES
-    const prop_info *pi;
+#ifndef ATH_WIFI
+    char supp_rdy_status[PROPERTY_VALUE_MAX] = "";
+    const prop_info *rdy_pi = NULL;
+    int rdy_loop_count = 0;
+#endif
+    const prop_info *pi = NULL;
     unsigned serial = 0;
 #endif
 
@@ -562,7 +567,22 @@ int wifi_start_supplicant()
         if (pi != NULL) {
             __system_property_read(pi, NULL, supp_status);
             if (strcmp(supp_status, "running") == 0) {
+#ifndef ATH_WIFI
+                for (rdy_loop_count = 0; rdy_loop_count < 15000/RDY_WAIT_MS;
+                                rdy_loop_count ++) {
+                        if (rdy_pi == NULL) {
+                                rdy_pi = __system_property_find(SUPP_RDY_PROP_NAME);
+                        } else {
+                                __system_property_read(rdy_pi, NULL, supp_rdy_status);
+                                if (strcmp(supp_rdy_status, "1") == 0)
+                                        return 0;
+                        }
+                        usleep (RDY_WAIT_MS * 1000);
+                }
+                return -1;
+#else
                 return 0;
+#endif
             } else if (pi->serial != serial &&
                     strcmp(supp_status, "stopped") == 0) {
                 return -1;
