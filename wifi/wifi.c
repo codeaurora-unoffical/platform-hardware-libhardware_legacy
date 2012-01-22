@@ -243,6 +243,7 @@ int wifi_load_driver()
 {
 #ifdef WIFI_DRIVER_MODULE_PATH
     char driver_status[PROPERTY_VALUE_MAX];
+    char ath6kl_supported[PROPERTY_VALUE_MAX];
     int count = 100; /* wait at most 20 seconds for completion */
     int status = -1;
 
@@ -254,6 +255,7 @@ int wifi_load_driver()
         return -1;
     }
     property_set(DRIVER_PROP_NAME, "loading");
+    property_get("wlan.driver.ath", ath6kl_supported, 0);
 
     if(system(SDIO_POLLING_ON))
         LOGW("Couldn't turn on SDIO polling: %s", SDIO_POLLING_ON);
@@ -273,7 +275,15 @@ int wifi_load_driver()
 
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         /* usleep(WIFI_DRIVER_LOADER_DELAY); */
-        property_set(DRIVER_PROP_NAME, "ok");
+        if (*ath6kl_supported == '1')
+        {
+            LOGD("ATH6KL getting executed");
+            usleep(3*WIFI_DRIVER_LOADER_DELAY);
+            property_set(DRIVER_PROP_NAME, "ok");
+        } else {
+            LOGD("WCN getting executed");
+            property_set(DRIVER_PROP_NAME, "ok");
+        }
     }
     else {
         property_set("ctl.start", FIRMWARE_LOADER);
