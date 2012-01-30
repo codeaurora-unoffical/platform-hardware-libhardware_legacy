@@ -60,22 +60,30 @@ static char iface[PROPERTY_VALUE_MAX];
 #ifndef WIFI_DRIVER_MODULE_NAME
 #define WIFI_DRIVER_MODULE_NAME         "wlan"
 #endif
+#ifndef WIFI_DRIVER_MODULE_ARG
+#define WIFI_DRIVER_MODULE_ARG          ""
+#endif
+
 #ifndef WIFI_SDIO_IF_DRIVER_MODULE_PATH
 #define WIFI_SDIO_IF_DRIVER_MODULE_PATH ""
 #endif
 #ifndef WIFI_SDIO_IF_DRIVER_MODULE_NAME
 #define WIFI_SDIO_IF_DRIVER_MODULE_NAME ""
 #endif
-#ifndef WIFI_FIRMWARE_LOADER
-#define WIFI_FIRMWARE_LOADER                    ""
-#endif
 #ifndef WIFI_SDIO_IF_DRIVER_MODULE_ARG
-#define WIFI_SDIO_IF_DRIVER_MODULE_ARG          ""
+#define WIFI_SDIO_IF_DRIVER_MODULE_ARG  ""
 #endif
 
-#ifndef WIFI_DRIVER_MODULE_ARG
-#define WIFI_DRIVER_MODULE_ARG          ""
+#ifndef WIFI_CFG80211_DRIVER_MODULE_PATH
+#define WIFI_CFG80211_DRIVER_MODULE_PATH ""
 #endif
+#ifndef WIFI_CFG80211_DRIVER_MODULE_NAME
+#define WIFI_CFG80211_DRIVER_MODULE_NAME ""
+#endif
+#ifndef WIFI_CFG80211_DRIVER_MODULE_ARG
+#define WIFI_CFG80211_DRIVER_MODULE_ARG  ""
+#endif
+
 #ifndef WIFI_FIRMWARE_LOADER
 #define WIFI_FIRMWARE_LOADER		""
 #endif
@@ -117,6 +125,10 @@ static int _wifi_unload_driver();   /* Does not check Bluetooth status */
 static const char DRIVER_SDIO_IF_MODULE_NAME[]  = WIFI_SDIO_IF_DRIVER_MODULE_NAME;
 static const char DRIVER_SDIO_IF_MODULE_PATH[]  = WIFI_SDIO_IF_DRIVER_MODULE_PATH;
 static const char DRIVER_SDIO_IF_MODULE_ARG[]   = WIFI_SDIO_IF_DRIVER_MODULE_ARG;
+
+static const char DRIVER_CFG80211_MODULE_NAME[]  = WIFI_CFG80211_DRIVER_MODULE_NAME;
+static const char DRIVER_CFG80211_MODULE_PATH[]  = WIFI_CFG80211_DRIVER_MODULE_PATH;
+static const char DRIVER_CFG80211_MODULE_ARG[]   = WIFI_CFG80211_DRIVER_MODULE_ARG;
 
 static const char IFACE_DIR[]           = "/data/system/wpa_supplicant";
 #ifdef WIFI_DRIVER_MODULE_PATH
@@ -260,8 +272,17 @@ int wifi_load_driver()
     if(system(SDIO_POLLING_ON))
         LOGW("Couldn't turn on SDIO polling: %s", SDIO_POLLING_ON);
 
+    if ('\0' != *DRIVER_CFG80211_MODULE_PATH) {
+        if (insmod(DRIVER_CFG80211_MODULE_PATH, DRIVER_CFG80211_MODULE_ARG) < 0) {
+             goto end;
+         }
+     }
+
     if ('\0' != *DRIVER_SDIO_IF_MODULE_PATH) {
        if (insmod(DRIVER_SDIO_IF_MODULE_PATH, DRIVER_SDIO_IF_MODULE_ARG) < 0) {
+           if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+               rmmod(DRIVER_CFG80211_MODULE_NAME);
+           }
            goto end;
        }
     }
@@ -269,6 +290,9 @@ int wifi_load_driver()
     if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
         if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
            rmmod(DRIVER_SDIO_IF_MODULE_NAME);
+        }
+        if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+            rmmod(DRIVER_CFG80211_MODULE_NAME);
         }
         goto end;
     }
@@ -328,13 +352,17 @@ static int _wifi_unload_driver()
         }
         if (count) {
             if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
-                if (rmmod(DRIVER_SDIO_IF_MODULE_NAME) == 0) {
-                    return 0;
+                if (!(rmmod(DRIVER_SDIO_IF_MODULE_NAME) == 0)) {
+                    return -1;
                 }
             }
-            else  {
-                return 0;
+            if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                if (!(rmmod(DRIVER_CFG80211_MODULE_NAME) == 0)) {
+                    return -1;
+                }
             }
+
+            return 0;
         }
 
         return -1;
