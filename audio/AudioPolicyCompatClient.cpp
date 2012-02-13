@@ -47,11 +47,13 @@ audio_io_handle_t AudioPolicyCompatClient::openSession(uint32_t *pDevices,
                                 uint32_t *pFormat,
                                 AudioSystem::output_flags flags,
                                 int32_t  streamType,
-                                int32_t  sessionId)
+                                int32_t  sessionId,
+                                uint32_t samplingRate,
+                                uint32_t channels)
 {
     return mServiceOps->open_session(mService,pDevices,pFormat,
                                      (audio_policy_output_flags_t)flags,
-                                     streamType,sessionId);
+                                     streamType,sessionId, samplingRate, channels);
 }
 
 audio_io_handle_t AudioPolicyCompatClient::closeSession(audio_io_handle_t output)
