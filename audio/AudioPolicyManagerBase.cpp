@@ -20,6 +20,7 @@
 #include <hardware_legacy/AudioPolicyManagerBase.h>
 #include <hardware/audio_effect.h>
 #include <math.h>
+#include <stdio.h>
 
 namespace android_audio_legacy {
 
@@ -1067,6 +1068,16 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
     mTotalEffectsCpuLoad(0), mTotalEffectsMemory(0),
     mA2dpSuspended(false)
 {
+    //Check if HDMI is the primary interface
+    //In that case we need to route audio to HDMI
+    bool hdmi_as_primary = false;
+    const char* file = "/sys/class/graphics/fb0/hdmi_primary";
+    FILE* fp = fopen(file, "r");
+    if(fp) {
+        LOGD("%s: HDMI is used as primary interface", __FUNCTION__);
+        hdmi_as_primary = true;
+        fclose(fp);
+    }
     mpClientInterface = clientInterface;
 
     for (int i = 0; i < AudioSystem::NUM_FORCE_USE; i++) {
@@ -1080,12 +1091,12 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
                         AudioSystem::DEVICE_OUT_SPEAKER;
     mAvailableInputDevices = AudioSystem::DEVICE_IN_BUILTIN_MIC;
 
-#ifdef USE_HDMI_AS_PRIMARY
-    // If HDMI is used as primary then all audio should always be
-    // routed to HDMI by default. The connection can be assumed to
-    // be always ON. Overrideable by Bluetooth.
-    mAvailableOutputDevices |= AUDIO_DEVICE_OUT_AUX_DIGITAL;
-#endif
+    if(hdmi_as_primary) {
+        // If HDMI is used as primary then all audio should always be
+        // routed to HDMI by default. The connection can be assumed to
+        // be always ON. Overrideable by Bluetooth.
+        mAvailableOutputDevices |= AUDIO_DEVICE_OUT_AUX_DIGITAL;
+    }
 
 #ifdef WITH_A2DP
     mA2dpOutput = 0;
