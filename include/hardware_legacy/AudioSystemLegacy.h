@@ -248,6 +248,15 @@ public:
         NUM_MODES  // not a valid entry, denotes end-of-list
     };
 
+    enum audio_call_mode {
+        CS_INACTIVE   = 0x0,
+        CS_ACTIVE     = 0x1,
+        CS_HOLD       = 0x2,
+        IMS_INACTIVE  = 0x0,
+        IMS_ACTIVE  = 0x10,
+        IMS_HOLD      = 0x20
+    };
+
     enum audio_in_acoustics {
         AGC_ENABLE    = 0x0001,
         AGC_DISABLE   = 0,
