@@ -99,7 +99,9 @@ public:
     virtual audio_io_handle_t getSession(AudioSystem::stream_type stream,
                                         uint32_t format = AudioSystem::FORMAT_DEFAULT,
                                         AudioSystem::output_flags flags = AudioSystem::OUTPUT_FLAG_DIRECT,
-                                        int32_t  sessionId=-1) {return 0;};
+                                        int32_t  sessionId=-1,
+                                        uint32_t samplingRate=0,
+                                        uint32_t channels=0) {return 0;};
     // requests to pause an ongoing tunnel mode/ batch decode session.
     virtual void pauseSession(audio_io_handle_t output, AudioSystem::stream_type stream) {return;};
     // requests to resume an ongoing tunnel mode/ batch decode session.
@@ -195,7 +197,9 @@ public:
                                     uint32_t *pFormat,
                                     AudioSystem::output_flags flags,
                                     int32_t  streamType,
-                                    int32_t  sessionId) {return 0;};
+                                    int32_t  sessionId,
+                                    uint32_t samplingRate,
+                                    uint32_t channels) {return 0;};
     // closes the output audio session. 
     virtual status_t closeSession(audio_io_handle_t output) {return 0;};
     // creates a special output that is duplicated to the two outputs passed as arguments. The duplication is performed by
