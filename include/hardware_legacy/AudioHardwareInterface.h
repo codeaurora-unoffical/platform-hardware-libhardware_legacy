@@ -134,6 +134,10 @@ public:
     // return the number of audio frames written by the audio dsp to DAC since
     // the output has exited standby
     virtual status_t    getRenderPosition(uint32_t *dspFrames) = 0;
+
+    virtual status_t    getTimeStamp(uint64_t *timeStamp){return NO_ERROR;};
+
+    virtual status_t    setObserver(void *observer){return NO_ERROR;};
 };
 
 /**
