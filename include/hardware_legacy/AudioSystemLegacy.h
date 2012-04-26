@@ -151,6 +151,8 @@ public:
         AC3_PLUS            = 0x0b000000,
         DTS                 = 0x0c000000,
         WMA                 = 0x0d000000,
+        EVRCB               = 0x10000000,
+        EVRCWB              = 0x11000000,
         MAIN_FORMAT_MASK    = 0xFF000000,
         SUB_FORMAT_MASK     = 0x00FFFFFF,
         // Aliases
