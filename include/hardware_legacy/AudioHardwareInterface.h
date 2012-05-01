@@ -354,9 +354,9 @@ public:
     /** This method creates and opens the audio hardware output stream */
     virtual AudioBroadcastStream* openBroadcastStream(
                                 uint32_t devices,
-                                int      *format=0,
-                                uint32_t *channels=0,
-                                uint32_t *sampleRate=0,
+                                int      format=0,
+                                uint32_t channels=0,
+                                uint32_t sampleRate=0,
                                 uint32_t audioSource=0,
                                 status_t *status=0) {return NULL;};
     virtual    void        closeBroadcastStream(AudioBroadcastStream* out) {};
