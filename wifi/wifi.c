@@ -139,6 +139,7 @@ static const char DRIVER_MODULE_ARG[]   = WIFI_DRIVER_MODULE_ARG;
 #endif
 static const char FIRMWARE_LOADER[]     = WIFI_FIRMWARE_LOADER;
 static const char DRIVER_PROP_NAME[]    = "wlan.driver.status";
+static const char MODE_PROP_NAME[]      = "wlan.driver.mode";
 static const char SUPPLICANT_NAME[]     = "wpa_supplicant";
 static const char SUPP_PROP_NAME[]      = "init.svc.wpa_supplicant";
 static const char SUPP_CONFIG_TEMPLATE[]= "/system/etc/wifi/wpa_supplicant.conf";
@@ -287,19 +288,41 @@ int wifi_load_driver()
        }
     }
 
-    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
-        if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
-           rmmod(DRIVER_SDIO_IF_MODULE_NAME);
+    if (*ath6kl_supported == '2') {
+        char p2p_status[PROPERTY_VALUE_MAX];
+        char driver_parameter[PROPERTY_VALUE_MAX];
+
+        property_get(MODE_PROP_NAME, p2p_status, NULL);
+        driver_parameter[0] = '\0';
+
+        if (strcmp(p2p_status, WIFI_DRIVER_FW_PATH_P2P) == 0) {
+            strcpy(driver_parameter, "ath6kl_p2p=0x1");
         }
-        if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
-            rmmod(DRIVER_CFG80211_MODULE_NAME);
+
+        if (insmod(DRIVER_MODULE_PATH, driver_parameter) < 0) {
+            if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
+                rmmod(DRIVER_SDIO_IF_MODULE_NAME);
+            }
+            if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                rmmod(DRIVER_CFG80211_MODULE_NAME);
+            }
+            goto end;
         }
-        goto end;
+    } else {
+        if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
+            if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
+                rmmod(DRIVER_SDIO_IF_MODULE_NAME);
+            }
+            if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                rmmod(DRIVER_CFG80211_MODULE_NAME);
+            }
+            goto end;
+        }
     }
 
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         /* usleep(WIFI_DRIVER_LOADER_DELAY); */
-        if (*ath6kl_supported == '1')
+        if (*ath6kl_supported == '1' || *ath6kl_supported == '2')
         {
             LOGD("ATH6KL getting executed");
             usleep(3*WIFI_DRIVER_LOADER_DELAY);
@@ -913,10 +936,13 @@ const char *wifi_get_fw_path(int fw_type)
 {
     switch (fw_type) {
     case WIFI_GET_FW_PATH_STA:
+        property_set(MODE_PROP_NAME, WIFI_DRIVER_FW_PATH_STA);
         return WIFI_DRIVER_FW_PATH_STA;
     case WIFI_GET_FW_PATH_AP:
+        property_set(MODE_PROP_NAME, WIFI_DRIVER_FW_PATH_AP);
         return WIFI_DRIVER_FW_PATH_AP;
     case WIFI_GET_FW_PATH_P2P:
+        property_set(MODE_PROP_NAME, WIFI_DRIVER_FW_PATH_P2P);
         return WIFI_DRIVER_FW_PATH_P2P;
     }
     return NULL;
