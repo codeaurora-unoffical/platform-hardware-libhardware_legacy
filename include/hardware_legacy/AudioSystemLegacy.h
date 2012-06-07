@@ -260,8 +260,11 @@ public:
         CS_ACTIVE     = 0x1,
         CS_HOLD       = 0x2,
         IMS_INACTIVE  = 0x0,
-        IMS_ACTIVE  = 0x10,
-        IMS_HOLD      = 0x20
+        IMS_ACTIVE    = 0x10,
+        IMS_HOLD      = 0x20,
+        CS_INACTIVE_SESSION2   = 0x0,
+        CS_ACTIVE_SESSION2     = 0x100,
+        CS_HOLD_SESSION2       = 0x200,
     };
 
     enum audio_in_acoustics {
