@@ -1073,6 +1073,10 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
     bool hdmi_as_primary = false;
     const char* file = "/sys/class/graphics/fb0/hdmi_primary";
     FILE* fp = fopen(file, "r");
+    unsigned char mHwdeviceName[80];
+    FILE *mDeviceFilePointer;
+    bool isTargetLiquid = false;
+
     if(fp) {
         LOGD("%s: HDMI is used as primary interface", __FUNCTION__);
         hdmi_as_primary = true;
@@ -1087,8 +1091,26 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
     initializeVolumeCurves();
 
     // devices available by default are speaker, ear piece and microphone
-    mAvailableOutputDevices = AudioSystem::DEVICE_OUT_EARPIECE |
-                        AudioSystem::DEVICE_OUT_SPEAKER;
+    {
+        unsigned int minLength;
+        mDeviceFilePointer = fopen("/sys/devices/system/soc/soc0/hw_platform","rb");
+        if (mDeviceFilePointer) {
+            (void)fgets((char *)mHwdeviceName,sizeof(mHwdeviceName),mDeviceFilePointer);
+            minLength = strnlen((const char *)mHwdeviceName,sizeof(mHwdeviceName));
+            if (sizeof("Liquid") <= minLength)
+                minLength = strnlen("Liquid",sizeof("Liquid"));
+            if  (!strncmp("Liquid",(const char *)mHwdeviceName,minLength))
+                isTargetLiquid = true;
+            fclose (mDeviceFilePointer);
+        } else
+            LOGE("\n ERROR: Could not open hw_platform file\n");
+    }
+
+    if (isTargetLiquid == true)
+        mAvailableOutputDevices = AudioSystem::DEVICE_OUT_SPEAKER;
+    else
+        mAvailableOutputDevices = AudioSystem::DEVICE_OUT_EARPIECE |
+                                  AudioSystem::DEVICE_OUT_SPEAKER;
     mAvailableInputDevices = AudioSystem::DEVICE_IN_BUILTIN_MIC;
 
     if(hdmi_as_primary) {
