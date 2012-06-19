@@ -69,6 +69,7 @@ enum audio_source {
     AUDIO_SOURCE_LIST_END  // must be last - used to validate audio source type
 };
 
+#ifdef QCOM_MPQ_BROADCAST
 enum qcom_audio_source {
     QCOM_AUDIO_SOURCE_DEFAULT                       = 0x100,
     QCOM_AUDIO_SOURCE_DIGITAL_BROADCAST_MAIN_AD     = 0x101,
@@ -77,6 +78,12 @@ enum qcom_audio_source {
     QCOM_AUDIO_SOURCE_HDMI_IN                       = 0x103,
 };
 
+enum qcom_broadcast_audio_format {
+    QCOM_BROADCAST_AUDIO_FORMAT_LPCM                = 0x200,
+    QCOM_BROADCAST_AUDIO_FORMAT_COMPRESSED          = 0x201,
+    QCOM_BROADCAST_AUDIO_FORMAT_COMPRESSED_HBR      = 0x202
+};
+#endif
 
 class AudioSystem {
 public:
