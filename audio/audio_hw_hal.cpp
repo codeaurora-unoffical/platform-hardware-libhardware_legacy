@@ -422,7 +422,7 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     if (!out)
         return -ENOMEM;
 
-    out->legacy_out = ladev->hwif->openOutputStream(devices, (int *) &config->format,
+    out->legacy_out = ladev->hwif->openOutputStream(devices, flags, (int *) &config->format,
                                                     &config->channel_mask,
                                                     &config->sample_rate, &status);
     if (!out->legacy_out) {
