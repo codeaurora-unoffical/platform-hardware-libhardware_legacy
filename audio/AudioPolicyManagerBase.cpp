@@ -576,11 +576,15 @@ audio_io_handle_t AudioPolicyManagerBase::getOutput(AudioSystem::stream_type str
 #endif //AUDIO_POLICY_TEST
 
     // open a direct output if required by specified parameters
-    IOProfile *profile = getProfileForDirectOutput(device,
-                                                   samplingRate,
-                                                   format,
-                                                   channelMask,
-                                                   (audio_output_flags_t)flags);
+    IOProfile *profile = NULL;
+    if (flags & AUDIO_OUTPUT_FLAG_DIRECT) {
+        profile = getProfileForDirectOutput(device,
+                                            samplingRate,
+                                            format,
+                                            channelMask,
+                                            (audio_output_flags_t)flags);
+    }
+
     if (profile != NULL) {
         AudioOutputDescriptor *outputDesc = NULL;
 
