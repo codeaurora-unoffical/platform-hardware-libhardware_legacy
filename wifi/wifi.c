@@ -65,13 +65,33 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 // TODO: use new ANDROID_SOCKET mechanism, once support for multiple
 // sockets is in
 
+#ifndef WIFI_DRIVER_MODULE_PATH
+#define WIFI_DRIVER_MODULE_PATH         "/system/lib/modules/wlan.ko"
+#endif
+#ifndef WIFI_DRIVER_MODULE_NAME
+#define WIFI_DRIVER_MODULE_NAME         "wlan"
+#endif
 #ifndef WIFI_DRIVER_MODULE_ARG
 #define WIFI_DRIVER_MODULE_ARG          ""
 #endif
+
+#ifndef WIFI_CFG80211_DRIVER_MODULE_PATH
+#define WIFI_CFG80211_DRIVER_MODULE_PATH ""
+#endif
+#ifndef WIFI_CFG80211_DRIVER_MODULE_NAME
+#define WIFI_CFG80211_DRIVER_MODULE_NAME ""
+#endif
+#ifndef WIFI_CFG80211_DRIVER_MODULE_ARG
+#define WIFI_CFG80211_DRIVER_MODULE_ARG  ""
+#endif
+
 #ifndef WIFI_FIRMWARE_LOADER
 #define WIFI_FIRMWARE_LOADER		""
 #endif
+
+#ifndef WIFI_TEST_INTERFACE
 #define WIFI_TEST_INTERFACE		"sta"
+#endif
 
 #ifndef WIFI_DRIVER_FW_PATH_STA
 #define WIFI_DRIVER_FW_PATH_STA		NULL
@@ -87,15 +107,26 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 #define WIFI_DRIVER_FW_PATH_PARAM	"/sys/module/wlan/parameters/fwpath"
 #endif
 
+#ifndef WIFI_DRIVER_DEF_CONF_FILE
+#define WIFI_DRIVER_DEF_CONF_FILE   ""
+#endif
+
+#ifndef WIFI_DRIVER_CONF_FILE
+#define WIFI_DRIVER_CONF_FILE       ""
+#endif
+
 #define WIFI_DRIVER_LOADER_DELAY	1000000
 
-static const char IFACE_DIR[]           = "/data/system/wpa_supplicant";
+static const char IFACE_DIR[]           = "";
 #ifdef WIFI_DRIVER_MODULE_PATH
 static const char DRIVER_MODULE_NAME[]  = WIFI_DRIVER_MODULE_NAME;
 static const char DRIVER_MODULE_TAG[]   = WIFI_DRIVER_MODULE_NAME " ";
 static const char DRIVER_MODULE_PATH[]  = WIFI_DRIVER_MODULE_PATH;
 static const char DRIVER_MODULE_ARG[]   = WIFI_DRIVER_MODULE_ARG;
 #endif
+static const char DRIVER_CFG80211_MODULE_NAME[]  = WIFI_CFG80211_DRIVER_MODULE_NAME;
+static const char DRIVER_CFG80211_MODULE_PATH[]  = WIFI_CFG80211_DRIVER_MODULE_PATH;
+static const char DRIVER_CFG80211_MODULE_ARG[]   = WIFI_CFG80211_DRIVER_MODULE_ARG;
 static const char FIRMWARE_LOADER[]     = WIFI_FIRMWARE_LOADER;
 static const char DRIVER_PROP_NAME[]    = "wlan.driver.status";
 static const char SUPPLICANT_NAME[]     = "wpa_supplicant";
@@ -107,7 +138,8 @@ static const char SUPP_CONFIG_FILE[]    = "/data/misc/wifi/wpa_supplicant.conf";
 static const char P2P_CONFIG_FILE[]     = "/data/misc/wifi/p2p_supplicant.conf";
 static const char CONTROL_IFACE_PATH[]  = "/data/misc/wifi/sockets";
 static const char MODULE_FILE[]         = "/proc/modules";
-
+static const char DRIVER_CFG_DEF_FILE[] = WIFI_DRIVER_DEF_CONF_FILE;
+static const char DRIVER_CFG_FILE[]     = WIFI_DRIVER_CONF_FILE;
 static const char SUPP_ENTROPY_FILE[]   = WIFI_ENTROPY_FILE;
 static unsigned char dummy_key[21] = { 0x02, 0x11, 0xbe, 0x33, 0x43, 0x35,
                                        0x68, 0x47, 0x84, 0x99, 0xa9, 0x2b,
@@ -165,6 +197,117 @@ static int rmmod(const char *modname)
     return ret;
 }
 
+static int _wifi_unload_driver()
+{
+    int count = 20; /* wait at most 10 seconds for completion */
+    char driver_status[PROPERTY_VALUE_MAX];
+    int s, ret;
+
+    if (rmmod(DRIVER_MODULE_NAME) == 0) {
+        while (count-- > 0) {
+            if (!is_wifi_driver_loaded())
+                break;
+            usleep(500000);
+        }
+        if (count) {
+           if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                if (!(rmmod(DRIVER_CFG80211_MODULE_NAME) == 0)) {
+                    return -1;
+                }
+            }
+            return 0;
+        }
+        return -1;
+    } else
+        return -1;
+}
+
+static int copy_config_file(const char *dest_file, const char *source_file)
+{
+    int srcfd, destfd;
+    char buf[2048];
+    int nread;
+
+    srcfd = open(source_file, O_RDONLY);
+    if (srcfd < 0) {
+        ALOGE("Cannot open \"%s\": %s", source_file, strerror(errno));
+        return -1;
+    }
+    destfd = open(dest_file, O_CREAT|O_RDWR, 0660);
+    if (destfd < 0) {
+        close(srcfd);
+        ALOGE("Cannot create \"%s\": %s", dest_file, strerror(errno));
+        return -1;
+    }
+
+    while ((nread = read(srcfd, buf, sizeof(buf))) != 0) {
+        if (nread < 0) {
+            ALOGE("Error reading \"%s\": %s", source_file, strerror(errno));
+            close(srcfd);
+            close(destfd);
+            unlink(dest_file);
+            return -1;
+        }
+        write(destfd, buf, nread);
+    }
+
+    close(destfd);
+    close(srcfd);
+
+    /* chmod is needed because open() didn't set permisions properly */
+    if (chmod(dest_file, 0660) < 0) {
+        ALOGE("Error changing permissions of %s to 0660: %s",
+             dest_file, strerror(errno));
+        unlink(dest_file);
+        return -1;
+    }
+    if (chown(dest_file, AID_SYSTEM, AID_WIFI) < 0) {
+        ALOGE("Error changing group ownership of %s to %d: %s",
+             dest_file, AID_WIFI, strerror(errno));
+        unlink(dest_file);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int ensure_wlan_driver_config_file_exists()
+{
+    int ret = 0;
+    struct stat sb;
+
+    /* if config files are not specified, we probably don't need
+     * config file for this platform */
+    if (!*DRIVER_CFG_FILE || !*DRIVER_CFG_DEF_FILE) {
+        ALOGI("wifi config files are not specified");
+        return 0;
+    }
+    ret = access(DRIVER_CFG_FILE, R_OK|W_OK);
+    if ((ret == 0) || (errno == EACCES)) {
+        /* even if we cannot change the permission do not return error,
+         * will try loading the driver anyway. */
+        if ((ret != 0) &&
+            (chmod(DRIVER_CFG_FILE, S_IRUSR|S_IWUSR|S_IRGRP) != 0)) {
+            ALOGW("Cannot set permission to \"%s\": %s",
+                    DRIVER_CFG_FILE, strerror(errno));
+            return 0;
+        }
+        /* return if filesize is at least 10 bytes */
+        if (stat(DRIVER_CFG_FILE, &sb) == 0 && sb.st_size > 10) {
+            ALOGE("File \"%s\" exists, not copying", DRIVER_CFG_FILE);
+            return 0;
+        }
+    } else if (errno != ENOENT) {
+        ALOGE("Cannot access \"%s\": %s", DRIVER_CFG_FILE, strerror(errno));
+        return -1;
+    }
+    if (copy_config_file(DRIVER_CFG_FILE, DRIVER_CFG_DEF_FILE) != 0) {
+        ALOGE("File copy failed: source \"%s\": destination \"%s\"",
+                DRIVER_CFG_DEF_FILE, DRIVER_CFG_FILE);
+        return -1;
+    }
+    return 0;
+}
 int do_dhcp_request(int *ipaddr, int *gateway, int *mask,
                     int *dns1, int *dns2, int *server, int *lease) {
     /* For test driver, always report success */
@@ -229,13 +372,29 @@ int wifi_load_driver()
 #ifdef WIFI_DRIVER_MODULE_PATH
     char driver_status[PROPERTY_VALUE_MAX];
     int count = 100; /* wait at most 20 seconds for completion */
+    int status = -1;
 
     if (is_wifi_driver_loaded()) {
         return 0;
     }
 
-    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
-        return -1;
+    /* ensure that wlan driver config file exists (if specified) */
+    property_set(DRIVER_PROP_NAME, "loading");
+
+    if ('\0' != *DRIVER_CFG80211_MODULE_PATH) {
+        if (insmod(DRIVER_CFG80211_MODULE_PATH, DRIVER_CFG80211_MODULE_ARG) < 0) {
+            ALOGI("insmod of CFG80211 driver failed");
+            goto end;
+        }
+    }
+
+    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
+        ALOGI("insmod of driver failed");
+        if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+             rmmod(DRIVER_CFG80211_MODULE_NAME);
+        }
+        goto end;
+    }
 
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         /* usleep(WIFI_DRIVER_LOADER_DELAY); */
@@ -247,18 +406,21 @@ int wifi_load_driver()
     sched_yield();
     while (count-- > 0) {
         if (property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
-            if (strcmp(driver_status, "ok") == 0)
-                return 0;
-            else if (strcmp(DRIVER_PROP_NAME, "failed") == 0) {
-                wifi_unload_driver();
-                return -1;
+            if (strcmp(driver_status, "ok") == 0) {
+                status = 0;
+                goto end;
+            }
+            else if (strcmp(driver_status, "failed") == 0) {
+                _wifi_unload_driver();
+                goto end;
             }
         }
         usleep(200000);
     }
     property_set(DRIVER_PROP_NAME, "timeout");
     wifi_unload_driver();
-    return -1;
+end:
+    return status;
 #else
     property_set(DRIVER_PROP_NAME, "ok");
     return 0;
@@ -269,20 +431,7 @@ int wifi_unload_driver()
 {
     usleep(200000); /* allow to finish interface down */
 #ifdef WIFI_DRIVER_MODULE_PATH
-    if (rmmod(DRIVER_MODULE_NAME) == 0) {
-        int count = 20; /* wait at most 10 seconds for completion */
-        while (count-- > 0) {
-            if (!is_wifi_driver_loaded())
-                break;
-            usleep(500000);
-        }
-        usleep(500000); /* allow card removal */
-        if (count) {
-            return 0;
-        }
-        return -1;
-    } else
-        return -1;
+    return _wifi_unload_driver();
 #else
     property_set(DRIVER_PROP_NAME, "unloaded");
     return 0;
@@ -868,6 +1017,7 @@ int wifi_change_fw_path(const char *fwpath)
     int fd;
     int ret = 0;
 
+    return ret;
     if (!fwpath)
         return ret;
     fd = TEMP_FAILURE_RETRY(open(WIFI_DRIVER_FW_PATH_PARAM, O_WRONLY));
