@@ -379,6 +379,9 @@ int wifi_load_driver()
     }
 
     /* ensure that wlan driver config file exists (if specified) */
+    if (ensure_wlan_driver_config_file_exists()) {
+        return -1;
+    }
     property_set(DRIVER_PROP_NAME, "loading");
 
     if ('\0' != *DRIVER_CFG80211_MODULE_PATH) {
