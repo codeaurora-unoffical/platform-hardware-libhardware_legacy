@@ -75,6 +75,16 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 #define WIFI_DRIVER_MODULE_ARG          ""
 #endif
 
+#ifndef WIFI_SDIO_IF_DRIVER_MODULE_PATH
+#define WIFI_SDIO_IF_DRIVER_MODULE_PATH ""
+#endif
+#ifndef WIFI_SDIO_IF_DRIVER_MODULE_NAME
+#define WIFI_SDIO_IF_DRIVER_MODULE_NAME ""
+#endif
+#ifndef WIFI_SDIO_IF_DRIVER_MODULE_ARG
+#define WIFI_SDIO_IF_DRIVER_MODULE_ARG  ""
+#endif
+
 #ifndef WIFI_CFG80211_DRIVER_MODULE_PATH
 #define WIFI_CFG80211_DRIVER_MODULE_PATH ""
 #endif
@@ -116,6 +126,16 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 #endif
 
 #define WIFI_DRIVER_LOADER_DELAY	1000000
+#define RDY_WAIT_MS                     10
+
+static const char SUPP_RDY_PROP_NAME[]  = "wifi.wpa_supp_ready";
+static const char DRIVER_SDIO_IF_MODULE_NAME[]  = WIFI_SDIO_IF_DRIVER_MODULE_NAME;
+static const char DRIVER_SDIO_IF_MODULE_PATH[]  = WIFI_SDIO_IF_DRIVER_MODULE_PATH;
+static const char DRIVER_SDIO_IF_MODULE_ARG[]   = WIFI_SDIO_IF_DRIVER_MODULE_ARG;
+
+static const char DRIVER_CFG80211_MODULE_NAME[]  = WIFI_CFG80211_DRIVER_MODULE_NAME;
+static const char DRIVER_CFG80211_MODULE_PATH[]  = WIFI_CFG80211_DRIVER_MODULE_PATH;
+static const char DRIVER_CFG80211_MODULE_ARG[]   = WIFI_CFG80211_DRIVER_MODULE_ARG;
 
 static const char IFACE_DIR[]           = "";
 #ifdef WIFI_DRIVER_MODULE_PATH
@@ -124,9 +144,6 @@ static const char DRIVER_MODULE_TAG[]   = WIFI_DRIVER_MODULE_NAME " ";
 static const char DRIVER_MODULE_PATH[]  = WIFI_DRIVER_MODULE_PATH;
 static const char DRIVER_MODULE_ARG[]   = WIFI_DRIVER_MODULE_ARG;
 #endif
-static const char DRIVER_CFG80211_MODULE_NAME[]  = WIFI_CFG80211_DRIVER_MODULE_NAME;
-static const char DRIVER_CFG80211_MODULE_PATH[]  = WIFI_CFG80211_DRIVER_MODULE_PATH;
-static const char DRIVER_CFG80211_MODULE_ARG[]   = WIFI_CFG80211_DRIVER_MODULE_ARG;
 static const char FIRMWARE_LOADER[]     = WIFI_FIRMWARE_LOADER;
 static const char DRIVER_PROP_NAME[]    = "wlan.driver.status";
 static const char SUPPLICANT_NAME[]     = "wpa_supplicant";
@@ -210,6 +227,11 @@ static int _wifi_unload_driver()
             usleep(500000);
         }
         if (count) {
+           if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
+                if (!(rmmod(DRIVER_SDIO_IF_MODULE_NAME) == 0)) {
+                    return -1;
+                }
+            }
            if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
                 if (!(rmmod(DRIVER_CFG80211_MODULE_NAME) == 0)) {
                     return -1;
@@ -221,7 +243,6 @@ static int _wifi_unload_driver()
     } else
         return -1;
 }
-
 static int copy_config_file(const char *dest_file, const char *source_file)
 {
     int srcfd, destfd;
@@ -378,27 +399,40 @@ int wifi_load_driver()
         return 0;
     }
 
-    /* ensure that wlan driver config file exists (if specified) */
+        /* ensure that wlan driver config file exists (if specified) */
     if (ensure_wlan_driver_config_file_exists()) {
         return -1;
     }
     property_set(DRIVER_PROP_NAME, "loading");
 
+    /*SDIO polling is enabled by wifi-sdio-on service */
+    property_set("ctl.start", "wifi-sdio-on");
+
     if ('\0' != *DRIVER_CFG80211_MODULE_PATH) {
-        if (insmod(DRIVER_CFG80211_MODULE_PATH, DRIVER_CFG80211_MODULE_ARG) < 0) {
-            ALOGI("insmod of CFG80211 driver failed");
+        if (insmod(DRIVER_CFG80211_MODULE_PATH,DRIVER_CFG80211_MODULE_ARG) < 0) {
+            ALOGI("insmod for %s failed \n",DRIVER_CFG80211_MODULE_PATH);
             goto end;
         }
     }
-
-    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
-        ALOGI("insmod of driver failed");
-        if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
-             rmmod(DRIVER_CFG80211_MODULE_NAME);
+    if ('\0' != *DRIVER_SDIO_IF_MODULE_PATH) {
+        if (insmod(DRIVER_SDIO_IF_MODULE_PATH, DRIVER_SDIO_IF_MODULE_ARG) < 0) {
+            ALOGI("insmod for %s failed \n",DRIVER_SDIO_IF_MODULE_PATH);
+            if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                  rmmod(DRIVER_CFG80211_MODULE_NAME);
+            }
+                goto end;
         }
-        goto end;
     }
-
+    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
+        ALOGI("insmod for %s failed \n",DRIVER_MODULE_PATH);
+        if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                rmmod(DRIVER_CFG80211_MODULE_NAME);
+        }
+            if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
+                    rmmod(DRIVER_SDIO_IF_MODULE_NAME);
+            }
+                goto end;
+    }
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         /* usleep(WIFI_DRIVER_LOADER_DELAY); */
         property_set(DRIVER_PROP_NAME, "ok");
@@ -660,6 +694,9 @@ int wifi_start_supplicant(int p2p_supported)
 #ifdef HAVE_LIBC_SYSTEM_PROPERTIES
     const prop_info *pi;
     unsigned serial = 0, i;
+    char supp_rdy_status[PROPERTY_VALUE_MAX] = "";
+    const prop_info *rdy_pi = NULL;
+    int rdy_loop_count = 0;
 #endif
 
     if (p2p_supported) {
@@ -727,11 +764,24 @@ int wifi_start_supplicant(int p2p_supported)
         if (pi != NULL) {
             __system_property_read(pi, NULL, supp_status);
             if (strcmp(supp_status, "running") == 0) {
-                return 0;
+                for (rdy_loop_count = 0; rdy_loop_count < 15000/RDY_WAIT_MS;
+                                rdy_loop_count ++) {
+                    if (rdy_pi == NULL) {
+                        rdy_pi = __system_property_find(SUPP_RDY_PROP_NAME);
+                    } else {
+                           __system_property_read(rdy_pi, NULL, supp_rdy_status);
+                           if (strcmp(supp_rdy_status, "1") == 0)
+                           {
+                               return 0;
+                           }
+                      }
+                    usleep (RDY_WAIT_MS * 1000);
+                }
+                return -1;
             } else if (pi->serial != serial &&
                     strcmp(supp_status, "stopped") == 0) {
-                return -1;
-            }
+                  return -1;
+              }
         }
 #else
         if (property_get(supplicant_prop_name, supp_status, NULL)) {
