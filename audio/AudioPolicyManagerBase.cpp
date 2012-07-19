@@ -2313,21 +2313,18 @@ bool AudioPolicyManagerBase::needsDirectOuput(AudioSystem::stream_type stream,
                                     AudioSystem::output_flags flags,
                                     uint32_t device)
 {
-   bool directOutput_flag = false;
-
    LOGV("AudioPolicyManagerBase::needsDirectOuput stream = %d mPhoneState = %d \n",
         stream, mPhoneState);
 
    for (size_t i = 0; i < mOutputs.size(); i++) {
        if (mOutputs.valueAt(i)->mFlags & AudioSystem::OUTPUT_FLAG_DIRECT) {
-           directOutput_flag = true;
            LOGV("AudioPolicyManagerBase::needsDirectOuput i = %d mFlags = %x",
                 i, mOutputs.valueAt(i)->mFlags);
+           return false;
        }
    }
 
-   return ((!directOutput_flag) &&
-          (flags & AudioSystem::OUTPUT_FLAG_DIRECT) ||
+   return ((flags & AudioSystem::OUTPUT_FLAG_DIRECT) ||
           (format !=0 && !AudioSystem::isLinearPCM(format)) ||
           ((stream == AudioSystem::VOICE_CALL)
           && (channels == AudioSystem::CHANNEL_OUT_MONO)
