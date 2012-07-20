@@ -541,6 +541,9 @@ protected:
         void loadGlobalConfig(cnode *root);
         status_t loadAudioPolicyConfig(const char *path);
         void defaultAudioPolicyConfig(void);
+        // updates device caching and output for streams that can influence the
+        //    routing of notifications
+        void handleNotificationRoutingForStream(AudioSystem::stream_type stream);
 
 
         AudioPolicyClientInterface *mpClientInterface;  // audio policy client interface
@@ -602,9 +605,6 @@ protected:
 private:
         static float volIndexToAmpl(audio_devices_t device, const StreamDescriptor& streamDesc,
                 int indexInUi);
-        // updates device caching and output for streams that can influence the
-        //    routing of notifications
-        void handleNotificationRoutingForStream(AudioSystem::stream_type stream);
         static bool isVirtualInputDevice(audio_devices_t device);
 };
 
