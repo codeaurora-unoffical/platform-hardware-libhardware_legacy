@@ -2328,8 +2328,7 @@ bool AudioPolicyManagerBase::needsDirectOuput(AudioSystem::stream_type stream,
           (format !=0 && !AudioSystem::isLinearPCM(format)) ||
           ((stream == AudioSystem::VOICE_CALL)
           && (channels == AudioSystem::CHANNEL_OUT_MONO)
-          && ((samplingRate == 8000 )||(samplingRate == 16000 ))
-          && (mPhoneState == AudioSystem::MODE_IN_COMMUNICATION)));
+          && ((samplingRate == 8000 )||(samplingRate == 16000 ))));
 }
 
 uint32_t AudioPolicyManagerBase::getMaxEffectsCpuLoad()
