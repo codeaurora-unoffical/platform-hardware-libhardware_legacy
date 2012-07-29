@@ -69,6 +69,22 @@ enum audio_source {
     AUDIO_SOURCE_LIST_END  // must be last - used to validate audio source type
 };
 
+#ifdef QCOM_MPQ_BROADCAST
+enum qcom_audio_source {
+    QCOM_AUDIO_SOURCE_DEFAULT                       = 0x100,
+    QCOM_AUDIO_SOURCE_DIGITAL_BROADCAST_MAIN_AD     = 0x101,
+    QCOM_AUDIO_SOURCE_DIGITAL_BROADCAST_MAIN_ONLY   = 0x104,
+    QCOM_AUDIO_SOURCE_ANALOG_BROADCAST              = 0x102,
+    QCOM_AUDIO_SOURCE_HDMI_IN                       = 0x103,
+};
+
+enum qcom_broadcast_audio_format {
+    QCOM_BROADCAST_AUDIO_FORMAT_LPCM                = 0x200,
+    QCOM_BROADCAST_AUDIO_FORMAT_COMPRESSED          = 0x201,
+    QCOM_BROADCAST_AUDIO_FORMAT_COMPRESSED_HBR      = 0x202
+};
+#endif
+
 class AudioSystem {
 public:
     enum stream_type {
@@ -138,8 +154,13 @@ public:
         VORBIS              = 0x07000000,
         EVRC                = 0x08000000,
         QCELP               = 0x09000000,
+        AC3                 = 0x0a000000,
+        AC3_PLUS            = 0x0b000000,
+        DTS                 = 0x0c000000,
+        WMA                 = 0x0d000000,
         EVRCB               = 0x10000000,
         EVRCWB              = 0x11000000,
+        EAC3                = 0x12000000,
         MAIN_FORMAT_MASK    = 0xFF000000,
         SUB_FORMAT_MASK     = 0x00FFFFFF,
         // Aliases
@@ -269,6 +290,8 @@ public:
         DEVICE_OUT_AUX_DIGITAL = 0x400,
         DEVICE_OUT_ANLG_DOCK_HEADSET = 0x800,
         DEVICE_OUT_DGTL_DOCK_HEADSET = 0x1000,
+        DEVICE_OUT_DIRECTOUTPUT = 0x2000,
+        DEVICE_OUT_SPDIF = 0x4000,
         DEVICE_OUT_FM = 0x8000,
         DEVICE_OUT_FM_TX = 0x10000,
         DEVICE_OUT_ANC_HEADSET = 0x20000,
@@ -280,9 +303,9 @@ public:
                 DEVICE_OUT_BLUETOOTH_SCO_CARKIT | DEVICE_OUT_BLUETOOTH_A2DP | DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
                 DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER | DEVICE_OUT_AUX_DIGITAL |
                 DEVICE_OUT_ANLG_DOCK_HEADSET | DEVICE_OUT_DGTL_DOCK_HEADSET |
-                DEVICE_OUT_FM | DEVICE_OUT_FM_TX | DEVICE_OUT_ANC_HEADSET |
-                DEVICE_OUT_ANC_HEADPHONE | DEVICE_OUT_PROXY |
-                DEVICE_OUT_DEFAULT),
+                DEVICE_OUT_ANC_HEADSET | DEVICE_OUT_ANC_HEADPHONE |
+                DEVICE_OUT_FM | DEVICE_OUT_FM_TX | DEVICE_OUT_DIRECTOUTPUT |
+                DEVICE_OUT_PROXY | DEVICE_OUT_SPDIF | DEVICE_OUT_DEFAULT),
         DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP | DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
                 DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER),
 
@@ -298,14 +321,15 @@ public:
         DEVICE_IN_ANC_HEADSET = 0x10000000,
         DEVICE_IN_FM_RX = 0x20000000,
         DEVICE_IN_FM_RX_A2DP = 0x40000000,
-        DEVICE_IN_PROXY = 0x80000000,
-        DEVICE_IN_ANLG_DOCK_HEADSET = DEVICE_IN_PROXY,
         DEVICE_IN_DEFAULT = DEVICE_IN_BUILTIN_MIC,
+        DEVICE_IN_ANLG_DOCK_HEADSET = 0x80000000,
+        DEVICE_IN_PROXY = DEVICE_IN_ANLG_DOCK_HEADSET,
 
         DEVICE_IN_ALL = (DEVICE_IN_COMMUNICATION | DEVICE_IN_AMBIENT | DEVICE_IN_BUILTIN_MIC |
                 DEVICE_IN_BLUETOOTH_SCO_HEADSET | DEVICE_IN_WIRED_HEADSET | DEVICE_IN_AUX_DIGITAL |
-                DEVICE_IN_VOICE_CALL | DEVICE_IN_BACK_MIC | DEVICE_IN_ANC_HEADSET | DEVICE_IN_FM_RX |
-                DEVICE_IN_FM_RX_A2DP | DEVICE_IN_PROXY | DEVICE_IN_ANLG_DOCK_HEADSET | DEVICE_IN_DEFAULT)
+                DEVICE_IN_VOICE_CALL | DEVICE_IN_BACK_MIC | DEVICE_IN_ANC_HEADSET |
+                DEVICE_IN_FM_RX | DEVICE_IN_FM_RX_A2DP | DEVICE_IN_DEFAULT |
+                DEVICE_IN_ANLG_DOCK_HEADSET | DEVICE_IN_PROXY)
     };
 
     // request to open a direct output with getOutput() (by opposition to sharing an output with other AudioTracks)
