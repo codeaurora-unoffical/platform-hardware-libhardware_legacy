@@ -146,8 +146,7 @@ status_t AudioPolicyManagerBase::setDeviceConnectionState(AudioSystem::audio_dev
             for (size_t i = 0; i < outputs.size(); i++) {
                 // close unused outputs after device disconnection or direct outputs that have been
                 // opened by checkOutputsForDevice() to query dynamic parameters
-                if ((state == AudioSystem::DEVICE_STATE_UNAVAILABLE) ||
-                        (mOutputs.valueFor(outputs[i])->mFlags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+                if ((state == AudioSystem::DEVICE_STATE_UNAVAILABLE))  {
                     closeOutput(outputs[i]);
                 }
             }
