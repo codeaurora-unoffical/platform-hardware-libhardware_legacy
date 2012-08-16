@@ -128,6 +128,8 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 #define WIFI_DRIVER_LOADER_DELAY	1000000
 #define RDY_WAIT_MS                     10
 
+#define WIFI_WCN			'0'
+
 static const char SUPP_RDY_PROP_NAME[]  = "wifi.wpa_supp_ready";
 static const char DRIVER_SDIO_IF_MODULE_NAME[]  = WIFI_SDIO_IF_DRIVER_MODULE_NAME;
 static const char DRIVER_SDIO_IF_MODULE_PATH[]  = WIFI_SDIO_IF_DRIVER_MODULE_PATH;
@@ -216,9 +218,12 @@ static int rmmod(const char *modname)
 
 static int _wifi_unload_driver()
 {
+    char active_wlan_chip[PROPERTY_VALUE_MAX];
     int count = 20; /* wait at most 10 seconds for completion */
     char driver_status[PROPERTY_VALUE_MAX];
     int s, ret;
+
+    property_get("wlan.driver.ath", active_wlan_chip, 0);
 
     if (rmmod(DRIVER_MODULE_NAME) == 0) {
         while (count-- > 0) {
@@ -227,7 +232,7 @@ static int _wifi_unload_driver()
             usleep(500000);
         }
         if (count) {
-           if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
+           if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME && *active_wlan_chip == WIFI_WCN) {
                 if (!(rmmod(DRIVER_SDIO_IF_MODULE_NAME) == 0)) {
                     return -1;
                 }
@@ -392,6 +397,7 @@ int wifi_load_driver()
 {
 #ifdef WIFI_DRIVER_MODULE_PATH
     char driver_status[PROPERTY_VALUE_MAX];
+    char active_wlan_chip[PROPERTY_VALUE_MAX];
     int count = 100; /* wait at most 20 seconds for completion */
     int status = -1;
 
@@ -408,13 +414,15 @@ int wifi_load_driver()
     /*SDIO polling is enabled by wifi-sdio-on service */
     property_set("ctl.start", "wifi-sdio-on");
 
+    property_get("wlan.driver.ath", active_wlan_chip, 0);
+
     if ('\0' != *DRIVER_CFG80211_MODULE_PATH) {
         if (insmod(DRIVER_CFG80211_MODULE_PATH,DRIVER_CFG80211_MODULE_ARG) < 0) {
             ALOGI("insmod for %s failed \n",DRIVER_CFG80211_MODULE_PATH);
             goto end;
         }
     }
-    if ('\0' != *DRIVER_SDIO_IF_MODULE_PATH) {
+    if ('\0' != *DRIVER_SDIO_IF_MODULE_PATH && *active_wlan_chip == WIFI_WCN) {
         if (insmod(DRIVER_SDIO_IF_MODULE_PATH, DRIVER_SDIO_IF_MODULE_ARG) < 0) {
             ALOGI("insmod for %s failed \n",DRIVER_SDIO_IF_MODULE_PATH);
             if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
