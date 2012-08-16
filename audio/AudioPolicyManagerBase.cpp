@@ -1577,13 +1577,17 @@ status_t AudioPolicyManagerBase::checkOutputsForDevice(audio_devices_t device,
             ALOGV("opening output for device %08x", device);
             desc = new AudioOutputDescriptor(profile);
             desc->mDevice = device;
-            audio_io_handle_t output = mpClientInterface->openOutput(profile->mModule->mHandle,
-                                                                       &desc->mDevice,
-                                                                       &desc->mSamplingRate,
-                                                                       &desc->mFormat,
-                                                                       &desc->mChannelMask,
-                                                                       &desc->mLatency,
-                                                                       desc->mFlags);
+            audio_io_handle_t output = 0;
+            if (!(desc->mFlags & AUDIO_OUTPUT_FLAG_LPA || desc->mFlags & AUDIO_OUTPUT_FLAG_TUNNEL ||
+                desc->mFlags & AUDIO_OUTPUT_FLAG_VOIP_RX)) {
+                output =  mpClientInterface->openOutput(profile->mModule->mHandle,
+                                                        &desc->mDevice,
+                                                        &desc->mSamplingRate,
+                                                        &desc->mFormat,
+                                                        &desc->mChannelMask,
+                                                        &desc->mLatency,
+                                                        desc->mFlags);
+            }
             if (output != 0) {
                 if (desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
                     String8 reply;
@@ -3208,6 +3212,9 @@ bool AudioPolicyManagerBase::IOProfile::isCompatibleProfile(audio_devices_t devi
             return false;
         }
     }
+    ALOGE(" profile found: device %x, flags %x, samplingrate %d,\
+            format %x, channelMask %d",
+            device, flags, samplingRate, format, channelMask);
     return true;
 }
 
