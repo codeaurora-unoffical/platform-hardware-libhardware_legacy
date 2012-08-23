@@ -128,7 +128,7 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 #define WIFI_DRIVER_LOADER_DELAY	1000000
 #define RDY_WAIT_MS                     10
 
-#define WIFI_WCN			'0'
+#define WIFI_WCN			0
 
 static const char SUPP_RDY_PROP_NAME[]  = "wifi.wpa_supp_ready";
 static const char DRIVER_SDIO_IF_MODULE_NAME[]  = WIFI_SDIO_IF_DRIVER_MODULE_NAME;
