@@ -325,7 +325,6 @@ int wifi_load_driver()
         if (*ath6kl_supported == '1' || *ath6kl_supported == '2')
         {
             LOGD("ATH6KL getting executed");
-            usleep(3*WIFI_DRIVER_LOADER_DELAY);
             property_set(DRIVER_PROP_NAME, "ok");
         } else {
             LOGD("WCN getting executed");
