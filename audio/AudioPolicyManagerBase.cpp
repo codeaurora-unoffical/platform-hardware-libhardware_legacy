@@ -459,7 +459,7 @@ AudioPolicyManagerBase::IOProfile *AudioPolicyManagerBase::getProfileForDirectOu
            IOProfile *profile = mHwModules[i]->mOutputProfiles[j];
            if (profile->isCompatibleProfile(device, samplingRate, format,
                                            channelMask,
-                                          (audio_output_flags_t)(flags|AUDIO_OUTPUT_FLAG_DIRECT))) {
+                                           AUDIO_OUTPUT_FLAG_DIRECT)) {
                if (mAvailableOutputDevices & profile->mSupportedDevices) {
                    return mHwModules[i]->mOutputProfiles[j];
                }
@@ -1274,8 +1274,8 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
         for (size_t j = 0; j < mHwModules[i]->mOutputProfiles.size(); j++)
         {
             const IOProfile *outProfile = mHwModules[i]->mOutputProfiles[j];
-            if ( (outProfile->mSupportedDevices & mAttachedOutputDevices) &&
-                  !(outProfile->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) ){
+
+            if (outProfile->mSupportedDevices & mAttachedOutputDevices) {
                 AudioOutputDescriptor *outputDesc = new AudioOutputDescriptor(outProfile);
                 outputDesc->mDevice = (audio_devices_t)(mDefaultOutputDevice &
                                                             outProfile->mSupportedDevices);
@@ -2367,6 +2367,7 @@ audio_devices_t AudioPolicyManagerBase::getDeviceForInputSource(int inputSource)
     case AUDIO_SOURCE_DEFAULT:
     case AUDIO_SOURCE_MIC:
     case AUDIO_SOURCE_VOICE_RECOGNITION:
+    case AUDIO_SOURCE_VOICE_COMMUNICATION:
         if (mForceUse[AudioSystem::FOR_RECORD] == AudioSystem::FORCE_BT_SCO &&
             mAvailableInputDevices & AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
             device = AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET;
@@ -2375,9 +2376,6 @@ audio_devices_t AudioPolicyManagerBase::getDeviceForInputSource(int inputSource)
         } else if (mAvailableInputDevices & AudioSystem::DEVICE_IN_BUILTIN_MIC) {
             device = AudioSystem::DEVICE_IN_BUILTIN_MIC;
         }
-        break;
-   case AUDIO_SOURCE_VOICE_COMMUNICATION:
-        device = AudioSystem::DEVICE_IN_COMMUNICATION;
         break;
     case AUDIO_SOURCE_CAMCORDER:
         if (mAvailableInputDevices & AudioSystem::DEVICE_IN_BACK_MIC) {
@@ -3287,7 +3285,6 @@ const struct StringToEnum sDeviceNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_DEVICE_IN_FM_RX_A2DP),
     STRING_TO_ENUM(AUDIO_DEVICE_IN_VOICE_CALL),
     STRING_TO_ENUM(AUDIO_DEVICE_IN_BACK_MIC),
-    STRING_TO_ENUM(AUDIO_DEVICE_IN_COMMUNICATION),
 };
 
 const struct StringToEnum sFlagNameToEnumTable[] = {
@@ -3295,9 +3292,6 @@ const struct StringToEnum sFlagNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_PRIMARY),
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_FAST),
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_DEEP_BUFFER),
-    STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_VOIP_RX),
-    STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_LPA),
-    STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_TUNNEL),
 };
 
 const struct StringToEnum sFormatNameToEnumTable[] = {
@@ -3309,18 +3303,6 @@ const struct StringToEnum sFormatNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_FORMAT_QCELP),
     STRING_TO_ENUM(AUDIO_FORMAT_AAC),
     STRING_TO_ENUM(AUDIO_FORMAT_VORBIS),
-    STRING_TO_ENUM(AUDIO_FORMAT_AC3),
-    STRING_TO_ENUM(AUDIO_FORMAT_EAC3),
-    STRING_TO_ENUM(AUDIO_FORMAT_DTS),
-    STRING_TO_ENUM(AUDIO_FORMAT_WMA),
-    STRING_TO_ENUM(AUDIO_FORMAT_WMA_PRO),
-    STRING_TO_ENUM(AUDIO_FORMAT_AAC_ADIF),
-    STRING_TO_ENUM(AUDIO_FORMAT_AMR_NB),
-    STRING_TO_ENUM(AUDIO_FORMAT_AMR_WB),
-    STRING_TO_ENUM(AUDIO_FORMAT_QCELP),
-    STRING_TO_ENUM(AUDIO_FORMAT_EVRC),
-    STRING_TO_ENUM(AUDIO_FORMAT_EVRCB),
-    STRING_TO_ENUM(AUDIO_FORMAT_EVRCWB),
 };
 
 const struct StringToEnum sOutChannelsNameToEnumTable[] = {
