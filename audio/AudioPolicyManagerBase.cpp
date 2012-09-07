@@ -3317,6 +3317,7 @@ const struct StringToEnum sDeviceNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_DEVICE_IN_VOICE_CALL),
     STRING_TO_ENUM(AUDIO_DEVICE_IN_BACK_MIC),
     STRING_TO_ENUM(AUDIO_DEVICE_IN_COMMUNICATION),
+    STRING_TO_ENUM(AUDIO_DEVICE_IN_PROXY),
 };
 
 const struct StringToEnum sFlagNameToEnumTable[] = {
