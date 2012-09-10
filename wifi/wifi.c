@@ -129,6 +129,7 @@ static char primary_iface[PROPERTY_VALUE_MAX];
 #define RDY_WAIT_MS                     10
 
 #define WIFI_WCN			"0"
+#define WIFI_ATH6KL_2			"2"
 
 static const char SUPP_RDY_PROP_NAME[]  = "wifi.wpa_supp_ready";
 static const char DRIVER_SDIO_IF_MODULE_NAME[]  = WIFI_SDIO_IF_DRIVER_MODULE_NAME;
@@ -148,6 +149,7 @@ static const char DRIVER_MODULE_ARG[]   = WIFI_DRIVER_MODULE_ARG;
 #endif
 static const char FIRMWARE_LOADER[]     = WIFI_FIRMWARE_LOADER;
 static const char DRIVER_PROP_NAME[]    = "wlan.driver.status";
+static const char MODE_PROP_NAME[]      = "wlan.driver.mode";
 static const char SUPPLICANT_NAME[]     = "wpa_supplicant";
 static const char SUPP_PROP_NAME[]      = "init.svc.wpa_supplicant";
 static const char P2P_SUPPLICANT_NAME[] = "p2p_supplicant";
@@ -416,30 +418,67 @@ int wifi_load_driver()
 
     property_get("wlan.driver.ath", active_wlan_chip, WIFI_WCN);
 
-    if ('\0' != *DRIVER_CFG80211_MODULE_PATH) {
-        if (insmod(DRIVER_CFG80211_MODULE_PATH,DRIVER_CFG80211_MODULE_ARG) < 0) {
-            ALOGI("insmod for %s failed \n",DRIVER_CFG80211_MODULE_PATH);
+    if (0 == strcmp(active_wlan_chip, WIFI_ATH6KL_2)) {
+        char ap_status[PROPERTY_VALUE_MAX];
+        char driver_parameter[PROPERTY_VALUE_MAX];
+
+        property_get(MODE_PROP_NAME, ap_status, NULL);
+        driver_parameter[0] = '\0';
+
+        if (strcmp(ap_status, WIFI_DRIVER_FW_PATH_AP) != 0 &&
+            strcmp(ap_status, WIFI_DRIVER_FW_PATH_STA) != 0) {
+            status = 0;
             goto end;
         }
-    }
-    if ('\0' != *DRIVER_SDIO_IF_MODULE_PATH && (0 == strcmp(active_wlan_chip, WIFI_WCN))) {
-        if (insmod(DRIVER_SDIO_IF_MODULE_PATH, DRIVER_SDIO_IF_MODULE_ARG) < 0) {
-            ALOGI("insmod for %s failed \n",DRIVER_SDIO_IF_MODULE_PATH);
-            if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
-                  rmmod(DRIVER_CFG80211_MODULE_NAME);
-            }
+
+        if ('\0' != *DRIVER_CFG80211_MODULE_PATH) {
+            if (insmod(DRIVER_CFG80211_MODULE_PATH,DRIVER_CFG80211_MODULE_ARG) < 0) {
+                ALOGE("insmod for %s failed \n",DRIVER_CFG80211_MODULE_PATH);
                 goto end;
+            }
         }
-    }
-    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
-        ALOGI("insmod for %s failed \n",DRIVER_MODULE_PATH);
-        if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
-                rmmod(DRIVER_CFG80211_MODULE_NAME);
+
+        if (strcmp(ap_status, WIFI_DRIVER_FW_PATH_AP) == 0) {
+            strcpy(driver_parameter, "ath6kl_p2p=0x0");
         }
+
+        if (insmod(DRIVER_MODULE_PATH, driver_parameter) < 0) {
+             ALOGI("insmod for %s failed \n",DRIVER_MODULE_PATH);
+            if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                    rmmod(DRIVER_CFG80211_MODULE_NAME);
+            }
             if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
                     rmmod(DRIVER_SDIO_IF_MODULE_NAME);
             }
+            goto end;
+        }
+    }
+    else {
+        if ('\0' != *DRIVER_CFG80211_MODULE_PATH) {
+            if (insmod(DRIVER_CFG80211_MODULE_PATH,DRIVER_CFG80211_MODULE_ARG) < 0) {
+                ALOGI("insmod for %s failed \n",DRIVER_CFG80211_MODULE_PATH);
                 goto end;
+            }
+        }
+        if ('\0' != *DRIVER_SDIO_IF_MODULE_PATH && (0 == strcmp(active_wlan_chip, WIFI_WCN))) {
+            if (insmod(DRIVER_SDIO_IF_MODULE_PATH, DRIVER_SDIO_IF_MODULE_ARG) < 0) {
+                ALOGI("insmod for %s failed \n",DRIVER_SDIO_IF_MODULE_PATH);
+                if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                      rmmod(DRIVER_CFG80211_MODULE_NAME);
+                }
+                    goto end;
+            }
+        }
+        if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) {
+             ALOGI("insmod for %s failed \n",DRIVER_MODULE_PATH);
+            if ('\0' != *DRIVER_CFG80211_MODULE_NAME) {
+                    rmmod(DRIVER_CFG80211_MODULE_NAME);
+            }
+            if ('\0' != *DRIVER_SDIO_IF_MODULE_NAME) {
+                    rmmod(DRIVER_SDIO_IF_MODULE_NAME);
+            }
+            goto end;
+        }
     }
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         /* usleep(WIFI_DRIVER_LOADER_DELAY); */
@@ -474,6 +513,9 @@ end:
 
 int wifi_unload_driver()
 {
+    if (!is_wifi_driver_loaded()) {
+        return 0;
+    }
     usleep(200000); /* allow to finish interface down */
 #ifdef WIFI_DRIVER_MODULE_PATH
     return _wifi_unload_driver();
@@ -837,6 +879,7 @@ int wifi_stop_supplicant()
 #endif
     property_set("ctl.stop", supplicant_name);
     sched_yield();
+
     while (count-- > 0) {
         if (property_get(supplicant_prop_name, supp_status, NULL)) {
             if (strcmp(supp_status, "stopped") == 0)
@@ -1084,10 +1127,13 @@ const char *wifi_get_fw_path(int fw_type)
 {
     switch (fw_type) {
     case WIFI_GET_FW_PATH_STA:
+        property_set(MODE_PROP_NAME, WIFI_DRIVER_FW_PATH_STA);
         return WIFI_DRIVER_FW_PATH_STA;
     case WIFI_GET_FW_PATH_AP:
+        property_set(MODE_PROP_NAME, WIFI_DRIVER_FW_PATH_AP);
         return WIFI_DRIVER_FW_PATH_AP;
     case WIFI_GET_FW_PATH_P2P:
+        property_set(MODE_PROP_NAME, WIFI_DRIVER_FW_PATH_P2P);
         return WIFI_DRIVER_FW_PATH_P2P;
     }
     return NULL;
@@ -1098,7 +1144,19 @@ int wifi_change_fw_path(const char *fwpath)
     int len;
     int fd;
     int ret = 0;
+    char active_wlan_chip[PROPERTY_VALUE_MAX];
 
+    ALOGI(" called wifi_change_fw_path %s", fwpath);
+    property_get("wlan.driver.ath", active_wlan_chip, WIFI_WCN);
+    if (0 == strcmp(active_wlan_chip, WIFI_ATH6KL_2)) {
+
+        wifi_unload_driver();
+        ret = wifi_load_driver();
+        if (ret != 0) {
+            return -1;
+        }
+        property_set(MODE_PROP_NAME, NULL);
+    }
     return ret;
     if (!fwpath)
         return ret;
