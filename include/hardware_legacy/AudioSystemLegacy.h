@@ -84,6 +84,10 @@ enum qcom_broadcast_audio_format {
     QCOM_BROADCAST_AUDIO_FORMAT_COMPRESSED          = 0x201,
     QCOM_BROADCAST_AUDIO_FORMAT_COMPRESSED_HBR      = 0x202
 };
+enum qcom_broadcast_avsync_window_t {
+    QCOM_BROADCAST_AVSYNC_RENDER_WINDOW,
+    QCOM_BROADCAST_AVSYNC_STAT_WINDOW
+};
 #endif
 
 class AudioSystem {
