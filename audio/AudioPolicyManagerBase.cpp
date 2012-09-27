@@ -915,6 +915,7 @@ status_t AudioPolicyManagerBase::stopInput(audio_io_handle_t input)
         AudioParameter param = AudioParameter();
         param.addInt(String8(AudioParameter::keyRouting), 0);
         mpClientInterface->setParameters(input, param.toString());
+        setOutputDevice(mPrimaryOutput, getNewDevice(mPrimaryOutput, true), true);
         inputDesc->mRefCount = 0;
         return NO_ERROR;
     }
