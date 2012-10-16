@@ -3355,6 +3355,7 @@ const struct StringToEnum sFormatNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_FORMAT_EVRC),
     STRING_TO_ENUM(AUDIO_FORMAT_EVRCB),
     STRING_TO_ENUM(AUDIO_FORMAT_EVRCWB),
+    STRING_TO_ENUM(AUDIO_FORMAT_MP2),
 };
 
 const struct StringToEnum sOutChannelsNameToEnumTable[] = {
