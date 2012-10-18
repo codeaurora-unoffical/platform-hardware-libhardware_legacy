@@ -1150,7 +1150,6 @@ int wifi_change_fw_path(const char *fwpath)
     property_get("wlan.driver.ath", active_wlan_chip, WIFI_WCN);
     if (0 == strcmp(active_wlan_chip, WIFI_ATH6KL_2)) {
 
-        wifi_unload_driver();
         ret = wifi_load_driver();
         if (ret != 0) {
             return -1;
