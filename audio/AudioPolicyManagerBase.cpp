@@ -2449,11 +2449,11 @@ audio_devices_t AudioPolicyManagerBase::getDeviceForVolume(audio_devices_t devic
         // selection if not the speaker.
         if (device & AUDIO_DEVICE_OUT_SPEAKER) {
             device = AUDIO_DEVICE_OUT_SPEAKER;
-        }
-        else if((device & AUDIO_DEVICE_OUT_WIRED_HEADSET) != 0) {
+        } else if ((device & AUDIO_DEVICE_OUT_WIRED_HEADSET) != 0) {
             device = AUDIO_DEVICE_OUT_WIRED_HEADSET;
-        }
-        else {
+        } else if ((device & AUDIO_DEVICE_OUT_WIRED_HEADPHONE) != 0) {
+            device = AUDIO_DEVICE_OUT_WIRED_HEADPHONE;
+        } else {
             device = (audio_devices_t)(device & AUDIO_DEVICE_OUT_ALL_A2DP);
         }
     }
