@@ -968,7 +968,7 @@ status_t AudioPolicyManagerBase::setStreamVolumeIndex(AudioSystem::stream_type s
 
     // if device is AUDIO_DEVICE_OUT_DEFAULT set default value and
     // clear all device specific values
-    if (device == AUDIO_DEVICE_OUT_DEFAULT) {
+    if ((device == AUDIO_DEVICE_OUT_DEFAULT) && (AUDIO_DEVICE_OUT_DEFAULT != AUDIO_DEVICE_OUT_SPEAKER))  {
         mStreams[stream].mIndexCur.clear();
     }
     mStreams[stream].mIndexCur.add(device, index);
