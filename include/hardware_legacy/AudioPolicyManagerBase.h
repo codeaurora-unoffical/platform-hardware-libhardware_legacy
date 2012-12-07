@@ -476,7 +476,7 @@ protected:
                                    uint32_t samplingRate,
                                    uint32_t format,
                                    uint32_t channelMask);
-        IOProfile *getProfileForDirectOutput(audio_devices_t device,
+        virtual IOProfile *getProfileForDirectOutput(audio_devices_t device,
                                                        uint32_t samplingRate,
                                                        uint32_t format,
                                                        uint32_t channelMask,
