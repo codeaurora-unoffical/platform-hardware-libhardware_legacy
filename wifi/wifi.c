@@ -932,6 +932,30 @@ int wifi_send_command(int index, const char *cmd, char *reply, size_t *reply_len
     return 0;
 }
 
+
+void wifi_close_sockets(int index)
+{
+    if (ctrl_conn[index] != NULL) {
+        wpa_ctrl_close(ctrl_conn[index]);
+        ctrl_conn[index] = NULL;
+    }
+
+    if (monitor_conn[index] != NULL) {
+        wpa_ctrl_close(monitor_conn[index]);
+        monitor_conn[index] = NULL;
+    }
+
+    if (exit_sockets[index][0] >= 0) {
+        close(exit_sockets[index][0]);
+        exit_sockets[index][0] = -1;
+    }
+
+    if (exit_sockets[index][1] >= 0) {
+        close(exit_sockets[index][1]);
+        exit_sockets[index][1] = -1;
+    }
+}
+
 int wifi_ctrl_recv(int index, char *reply, size_t *reply_len)
 {
     int res;
@@ -950,10 +974,16 @@ int wifi_ctrl_recv(int index, char *reply, size_t *reply_len)
     }
     if (rfds[0].revents & POLLIN) {
         return wpa_ctrl_recv(monitor_conn[index], reply, reply_len);
-    } else {
-        return -2;
+    } else if (rfds[1].revents & POLLIN) {
+        /* Close only the p2p sockets on receive side
+         * see wifi_close_supplicant_connection()
+         */
+        if (index == SECONDARY) {
+            ALOGD("close sockets %d", index);
+            wifi_close_sockets(index);
+        }
     }
-    return 0;
+    return -2;
 }
 
 int wifi_wait_on_socket(int index, char *buf, size_t buflen)
@@ -1025,29 +1055,6 @@ int wifi_wait_for_event(const char *ifname, char *buf, size_t buflen)
     }
 }
 
-void wifi_close_sockets(int index)
-{
-    if (ctrl_conn[index] != NULL) {
-        wpa_ctrl_close(ctrl_conn[index]);
-        ctrl_conn[index] = NULL;
-    }
-
-    if (monitor_conn[index] != NULL) {
-        wpa_ctrl_close(monitor_conn[index]);
-        monitor_conn[index] = NULL;
-    }
-
-    if (exit_sockets[index][0] >= 0) {
-        close(exit_sockets[index][0]);
-        exit_sockets[index][0] = -1;
-    }
-
-    if (exit_sockets[index][1] >= 0) {
-        close(exit_sockets[index][1]);
-        exit_sockets[index][1] = -1;
-    }
-}
-
 void wifi_close_supplicant_connection(const char *ifname)
 {
     char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
@@ -1060,9 +1067,9 @@ void wifi_close_supplicant_connection(const char *ifname)
          * STA connection does not need it since supplicant gets shutdown
          */
         TEMP_FAILURE_RETRY(write(exit_sockets[SECONDARY][0], "T", 1));
-        wifi_close_sockets(SECONDARY);
-        //closing p2p connection does not need a wait on
-        //supplicant stop
+	/* p2p sockets are closed after the monitor thread
+         * receives the terminate on the exit socket
+         */
         return;
     }
 
