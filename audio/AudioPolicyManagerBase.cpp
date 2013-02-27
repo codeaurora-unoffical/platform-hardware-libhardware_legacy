@@ -2493,6 +2493,15 @@ AudioPolicyManagerBase::device_category AudioPolicyManagerBase::getDeviceCategor
     }
 }
 
+const float FM_Volume_table_HS[16] = {
+    0.0, 0.002172, 0.004660, 0.01, 0.014877, 0.023646, 0.037584, 0.055912, 0.088869, 0.141254, 0.189453, 0.266840, 0.375838, 0.504081, 0.709987, 1.0
+};
+
+const float FM_Volume_table_SPK[16] = {
+    0.0, 0.027024, 0.0469, 0.0668, 0.0866, 0.1065, 0.1264, 0.1463, 0.1662, 0.1861, 0.2060, 0.2259, 0.2458, 0.2657, 0.2856, 0.305555
+};
+
+
 float AudioPolicyManagerBase::volIndexToAmpl(audio_devices_t device, const StreamDescriptor& streamDesc,
         int indexInUi)
 {
@@ -2699,6 +2708,14 @@ float AudioPolicyManagerBase::computeVolume(int stream,
                 volume = minVol;
                 ALOGV("computeVolume limiting volume to %f musicVol %f", minVol, musicVol);
             }
+        }
+    }
+
+    if ((AudioSystem::stream_type)stream == AudioSystem::FM) {
+        if ((device & AudioSystem::DEVICE_OUT_WIRED_HEADSET) || (device & AudioSystem::DEVICE_OUT_WIRED_HEADPHONE))
+            volume = FM_Volume_table_HS[index];
+        else {
+            volume = FM_Volume_table_SPK[index];
         }
     }
 
