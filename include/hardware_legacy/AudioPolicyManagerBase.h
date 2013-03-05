@@ -229,6 +229,8 @@ protected:
         static const VolumeCurvePoint sHeadsetSystemVolumeCurve[AudioPolicyManagerBase::VOLCNT];
         // default volume curves per stream and device category. See initializeVolumeCurves()
         static const VolumeCurvePoint *sVolumeProfiles[AUDIO_STREAM_CNT][DEVICE_CATEGORY_CNT];
+        static const VolumeCurvePoint sFMHeadSetVolumeCurve[AudioPolicyManagerBase::VOLCNT];
+        static const VolumeCurvePoint sFMSpeakerVolumeCurve[AudioPolicyManagerBase::VOLCNT];
 
         // descriptor for audio outputs. Used to maintain current configuration of each opened audio output
         // and keep track of the usage of this output by each audio stream type.

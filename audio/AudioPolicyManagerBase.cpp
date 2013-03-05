@@ -2552,12 +2552,12 @@ const AudioPolicyManagerBase::VolumeCurvePoint
 
 const AudioPolicyManagerBase::VolumeCurvePoint
     AudioPolicyManagerBase::sSpeakerMediaVolumeCurve[AudioPolicyManagerBase::VOLCNT] = {
-    {1, -56.0f}, {20, -34.0f}, {60, -11.0f}, {100, 0.0f}
+    {1, -20.0f}, {20, -12.0f}, {60, -6.0f}, {100, 0.0f}
 };
 
 const AudioPolicyManagerBase::VolumeCurvePoint
     AudioPolicyManagerBase::sSpeakerSonificationVolumeCurve[AudioPolicyManagerBase::VOLCNT] = {
-    {1, -29.7f}, {33, -20.1f}, {66, -10.2f}, {100, 0.0f}
+    {1, -18.0f}, {20, -12.0f}, {60, -6.0f}, {100, 0.0f}
 };
 
 // AUDIO_STREAM_SYSTEM, AUDIO_STREAM_ENFORCED_AUDIBLE and AUDIO_STREAM_DTMF volume tracks
@@ -2571,6 +2571,16 @@ const AudioPolicyManagerBase::VolumeCurvePoint
 const AudioPolicyManagerBase::VolumeCurvePoint
     AudioPolicyManagerBase::sHeadsetSystemVolumeCurve[AudioPolicyManagerBase::VOLCNT] = {
     {1, -30.0f}, {33, -26.0f}, {66, -22.0f}, {100, -18.0f}
+};
+
+const AudioPolicyManagerBase::VolumeCurvePoint
+    AudioPolicyManagerBase::sFMSpeakerVolumeCurve[AudioPolicyManagerBase::VOLCNT] = {
+    {1, -28.0f}, {33, -19.0f}, {66, -13.0f}, {100, -10.3f}
+};
+
+const AudioPolicyManagerBase::VolumeCurvePoint
+    AudioPolicyManagerBase::sFMHeadSetVolumeCurve[AudioPolicyManagerBase::VOLCNT] = {
+    {1, -45.0f}, {20, -30.0f}, {60, -17.0f}, {100, 0.0f}
 };
 
 const AudioPolicyManagerBase::VolumeCurvePoint
@@ -2627,9 +2637,9 @@ const AudioPolicyManagerBase::VolumeCurvePoint
         sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EARPIECE
     },
     { // AUDIO_STREAM_FM
-        sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_HEADSET
-        sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER
-        sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EARPIECE
+        sFMHeadSetVolumeCurve, // DEVICE_CATEGORY_HEADSET
+        sFMSpeakerVolumeCurve, // DEVICE_CATEGORY_SPEAKER
+        sFMHeadSetVolumeCurve  // DEVICE_CATEGORY_EARPIECE
     },
 
 };
