@@ -2547,7 +2547,7 @@ const AudioPolicyManagerBase::VolumeCurvePoint
 
 const AudioPolicyManagerBase::VolumeCurvePoint
     AudioPolicyManagerBase::sDefaultMediaVolumeCurve[AudioPolicyManagerBase::VOLCNT] = {
-    {1, -58.0f}, {20, -40.0f}, {60, -17.0f}, {100, 0.0f}
+    {1, -58.0f}, {20, -35.0f}, {60, -17.0f}, {100, 0.0f}
 };
 
 const AudioPolicyManagerBase::VolumeCurvePoint
