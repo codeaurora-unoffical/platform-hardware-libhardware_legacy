@@ -22,6 +22,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <poll.h>
+#include <pthread.h>
 
 #include "hardware_legacy/wifi.h"
 #include "libwpa_client/wpa_ctrl.h"
@@ -49,6 +50,11 @@
 
 static struct wpa_ctrl *ctrl_conn[MAX_CONNS];
 static struct wpa_ctrl *monitor_conn[MAX_CONNS];
+
+/* wpa_supplicant does not support multithread under current design,
+ * so need a lock to prevent race condition. */
+static pthread_mutex_t wpa_supplicant_lock[MAX_CONNS] = {
+        PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER};
 
 /* socket pair used to exit from a blocking read */
 static int exit_sockets[MAX_CONNS][2];
@@ -849,6 +855,7 @@ int wifi_stop_supplicant()
 
 int wifi_connect_on_socket_path(int index, const char *path)
 {
+    int ret;
     char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
 
     /* Make sure supplicant is running */
@@ -858,22 +865,31 @@ int wifi_connect_on_socket_path(int index, const char *path)
         return -1;
     }
 
+    ret = pthread_mutex_lock(&wpa_supplicant_lock[index]);
+    if (ret) {
+        ALOGD("%s: failed to get wpa_supplicant lock, return %d\n", __func__, ret);
+        return -1;
+    }
+
     ctrl_conn[index] = wpa_ctrl_open(path);
     if (ctrl_conn[index] == NULL) {
         ALOGE("Unable to open connection to supplicant on \"%s\": %s",
              path, strerror(errno));
+        pthread_mutex_unlock(&wpa_supplicant_lock[index]);
         return -1;
     }
     monitor_conn[index] = wpa_ctrl_open(path);
     if (monitor_conn[index] == NULL) {
         wpa_ctrl_close(ctrl_conn[index]);
         ctrl_conn[index] = NULL;
+        pthread_mutex_unlock(&wpa_supplicant_lock[index]);
         return -1;
     }
     if (wpa_ctrl_attach(monitor_conn[index]) != 0) {
         wpa_ctrl_close(monitor_conn[index]);
         wpa_ctrl_close(ctrl_conn[index]);
         ctrl_conn[index] = monitor_conn[index] = NULL;
+        pthread_mutex_unlock(&wpa_supplicant_lock[index]);
         return -1;
     }
 
@@ -881,8 +897,11 @@ int wifi_connect_on_socket_path(int index, const char *path)
         wpa_ctrl_close(monitor_conn[index]);
         wpa_ctrl_close(ctrl_conn[index]);
         ctrl_conn[index] = monitor_conn[index] = NULL;
+        pthread_mutex_unlock(&wpa_supplicant_lock[index]);
         return -1;
     }
+
+    pthread_mutex_unlock(&wpa_supplicant_lock[index]);
 
     return 0;
 }
@@ -909,11 +928,21 @@ int wifi_send_command(int index, const char *cmd, char *reply, size_t *reply_len
 {
     int ret;
 
+    ret = pthread_mutex_lock(&wpa_supplicant_lock[index]);
+    if (ret) {
+        ALOGD("%s: failed to get wpa_supplicant lock, return %d\n", __func__, ret);
+        return -1;
+    }
+
     if (ctrl_conn[index] == NULL) {
         ALOGV("Not connected to wpa_supplicant - \"%s\" command dropped.\n", cmd);
+        pthread_mutex_unlock(&wpa_supplicant_lock[index]);
         return -1;
     }
     ret = wpa_ctrl_request(ctrl_conn[index], cmd, strlen(cmd), reply, reply_len, NULL);
+
+    pthread_mutex_unlock(&wpa_supplicant_lock[index]);
+
     if (ret == -2) {
         ALOGD("'%s' command timed out.\n", cmd);
         /* unblocks the monitor receive socket for termination */
@@ -931,6 +960,14 @@ int wifi_send_command(int index, const char *cmd, char *reply, size_t *reply_len
 
 void wifi_close_sockets(int index)
 {
+    int ret;
+
+    ret = pthread_mutex_lock(&wpa_supplicant_lock[index]);
+    if (ret) {
+        ALOGD("%s: failed to get wpa_supplicant lock, return %d\n", __func__, ret);
+        return;
+    }
+
     if (ctrl_conn[index] != NULL) {
         wpa_ctrl_close(ctrl_conn[index]);
         ctrl_conn[index] = NULL;
@@ -950,6 +987,8 @@ void wifi_close_sockets(int index)
         close(exit_sockets[index][1]);
         exit_sockets[index][1] = -1;
     }
+
+    pthread_mutex_unlock(&wpa_supplicant_lock[index]);
 }
 
 int wifi_ctrl_recv(int index, char *reply, size_t *reply_len)
@@ -991,12 +1030,23 @@ int wifi_wait_on_socket(int index, char *buf, size_t buflen)
     struct timeval tval;
     struct timeval *tptr;
 
+    result = pthread_mutex_lock(&wpa_supplicant_lock[index]);
+    if (result) {
+        ALOGD("%s: failed to get wpa_supplicant lock, return %d\n", __func__, result);
+        strncpy(buf, WPA_EVENT_TERMINATING " - failed to get wpa_supplicant lock", buflen-1);
+        buf[buflen-1] = '\0';
+        return strlen(buf);
+    }
+
     if (monitor_conn[index] == NULL) {
         ALOGD("Connection closed\n");
         strncpy(buf, WPA_EVENT_TERMINATING " - connection closed", buflen-1);
         buf[buflen-1] = '\0';
+        pthread_mutex_unlock(&wpa_supplicant_lock[index]);
         return strlen(buf);
     }
+
+    pthread_mutex_unlock(&wpa_supplicant_lock[index]);
 
     result = wifi_ctrl_recv(index, buf, &nread);
 
