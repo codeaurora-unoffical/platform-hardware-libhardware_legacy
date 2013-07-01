@@ -108,6 +108,171 @@ static const char P2P_CONFIG_FILE[]     = "/data/misc/wifi/p2p_supplicant.conf";
 static const char CONTROL_IFACE_PATH[]  = "/data/misc/wifi/sockets";
 static const char MODULE_FILE[]         = "/proc/modules";
 
+#ifdef WIFI_BT_STATUS_SYNC
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+
+#define WIFI_BT_STATUS_LOCK                         "/data/connectivity/wifi_bt_lock"
+#define WIFI_CHIP_QCA                                        "2"
+
+static const char SERVICE_PROP_NAME[]    = "wlan.hsic_ctrl";
+static const char BT_PROP_NAME[]                = "bluetooth.isEnabled";
+
+int wifi_semaphore_create(void)
+{
+    int fd;
+
+    fd = open(WIFI_BT_STATUS_LOCK, O_RDONLY);
+
+    /* lock file doesn't exits, then create the lock file */
+    if (fd == -1) {
+          mode_t old_mode;
+          old_mode = umask(000);
+
+         fd = open(WIFI_BT_STATUS_LOCK, O_RDONLY | O_CREAT, 0444);
+         if (fd == -1) {
+             ALOGE("can't create lock file: %s", strerror(errno));
+             /* reset to the older mode */
+             umask(old_mode);
+             return -1;
+         }
+
+        /* reset to the older mode */
+        umask(old_mode);
+    }
+
+    return fd;
+}
+
+int wifi_semaphore_get(int fd)
+{
+    int ret;
+
+    if (fd < 0)
+        return -1;
+
+    ret = flock(fd, LOCK_EX);
+    if (ret != 0) {
+        ALOGE("can't hold lock: %s\n", strerror(errno));
+        return -1;
+    }
+
+    return ret;
+}
+
+int wifi_semaphore_release(int fd)
+{
+    int ret;
+
+    if (fd < 0)
+        return -1;
+
+    ret = flock(fd, LOCK_UN);
+    if (ret != 0) {
+        ALOGE("can't release lock: %s\n", strerror(errno));
+        return -1;
+    }
+
+    return ret;
+}
+
+int wifi_semaphore_destroy(int fd)
+{
+
+    if (fd < 0)
+        return -1;
+
+    return close (fd);
+}
+
+#define MAX_DRV_CMD_SIZE        32
+
+struct ath6kl_android_wifi_priv_cmd {
+    char *buf;
+    int used_len;
+    int total_len;
+};
+
+int wifi_change_bt_satus(int is_bt_on)
+{
+    struct ifreq ifr;
+    struct ath6kl_android_wifi_priv_cmd priv_cmd;
+    char buf[MAX_DRV_CMD_SIZE];
+    int ret;
+    int ioctl_sock;
+
+    ioctl_sock = socket(PF_INET, SOCK_DGRAM, 0);
+    if (ioctl_sock < 0) {
+            ALOGE("can't open socket: %s", strerror(errno));
+            return -1;
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    memset(&priv_cmd, 0, sizeof(priv_cmd));
+    strlcpy(ifr.ifr_name, "wlan0", IFNAMSIZ);
+
+    memset(buf, 0, sizeof(buf));
+
+    snprintf(buf, sizeof(buf), "SET_BT_ON %d", is_bt_on);
+
+    priv_cmd.buf = buf;
+    priv_cmd.used_len = sizeof(buf);
+    priv_cmd.total_len = sizeof(buf);
+    ifr.ifr_data = &priv_cmd;
+
+    ret = ioctl(ioctl_sock, SIOCDEVPRIVATE + 1, &ifr);
+
+    if (ret < 0) {
+        ALOGE("%s: can't set ioctl: %s", __func__, strerror(errno));
+        return -1;
+    }
+
+    close(ioctl_sock);
+    return 0;
+}
+
+int wifi_wait_for_service_done(char *done_msg)
+{
+    char service_status[PROPERTY_VALUE_MAX];
+    int count = 30;
+    int ret = -1;
+
+    /* wait for service done */
+    while (count-- > 0) {
+        property_get(SERVICE_PROP_NAME, service_status, NULL);
+
+        if (strcmp(service_status, "") != 0) {
+            usleep(200000);
+        }
+        else {
+            property_set(SERVICE_PROP_NAME, done_msg);
+            ret = 0;
+            break;
+        }
+    }
+
+    return 0;
+}
+
+int is_wifi_qca(void)
+{
+    int ret = 0;
+    char wifi_soc_type[PROPERTY_VALUE_MAX];
+
+    ret = property_get("wlan.driver.ath", wifi_soc_type, NULL);
+
+    if (ret != 0) {
+        if (!strcmp(wifi_soc_type, WIFI_CHIP_QCA))
+            return 1;
+    }
+
+    return 0;
+}
+
+#endif
+
 static const char SUPP_ENTROPY_FILE[]   = WIFI_ENTROPY_FILE;
 static unsigned char dummy_key[21] = { 0x02, 0x11, 0xbe, 0x33, 0x43, 0x35,
                                        0x68, 0x47, 0x84, 0x99, 0xa9, 0x2b,
@@ -230,12 +395,54 @@ int wifi_load_driver()
     char driver_status[PROPERTY_VALUE_MAX];
     int count = 100; /* wait at most 20 seconds for completion */
 
+#ifdef WIFI_BT_STATUS_SYNC
+    int lock_fd = -1;
+    char bt_status[PROPERTY_VALUE_MAX];
+    char wlan_drv_param[32];
+    int wifi_chip_qca = 0;
+#endif
+
     if (is_wifi_driver_loaded()) {
         return 0;
     }
 
+#ifdef WIFI_BT_STATUS_SYNC
+    wifi_chip_qca = is_wifi_qca();
+
+    if (wifi_chip_qca) {
+        lock_fd = wifi_semaphore_create();
+        wifi_semaphore_get(lock_fd);
+
+        wifi_wait_for_service_done("wlan_loading");
+
+        property_get(BT_PROP_NAME, bt_status, NULL);
+
+        /* If BT is loaded */
+        if (strcmp(bt_status, "true") == 0) {
+            strlcpy(wlan_drv_param, "ath6kl_bt_on=1", 15);
+        }
+        else {
+            strlcpy(wlan_drv_param, "ath6kl_bt_on=0", 15);
+        }
+    }
+#endif
+
+#ifdef WIFI_BT_STATUS_SYNC
+    if (wifi_chip_qca) {
+        if (insmod(DRIVER_MODULE_PATH, wlan_drv_param) < 0) {
+            property_set(SERVICE_PROP_NAME, "");
+            wifi_semaphore_release(lock_fd);
+            wifi_semaphore_destroy(lock_fd);
+            return -1;
+        }
+    }
+    else {
+#endif
     if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
         return -1;
+#ifdef WIFI_BT_STATUS_SYNC
+    }
+#endif
 
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         /* usleep(WIFI_DRIVER_LOADER_DELAY); */
@@ -247,9 +454,24 @@ int wifi_load_driver()
     sched_yield();
     while (count-- > 0) {
         if (property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
-            if (strcmp(driver_status, "ok") == 0)
+            if (strcmp(driver_status, "ok") == 0) {
+#ifdef WIFI_BT_STATUS_SYNC
+               if (wifi_chip_qca) {
+                   property_set(SERVICE_PROP_NAME, "");
+                   wifi_semaphore_release(lock_fd);
+                   wifi_semaphore_destroy(lock_fd);
+               }
+#endif
                 return 0;
+            }
             else if (strcmp(DRIVER_PROP_NAME, "failed") == 0) {
+#ifdef WIFI_BT_STATUS_SYNC
+               if (wifi_chip_qca) {
+                   property_set(SERVICE_PROP_NAME, "");
+                   wifi_semaphore_release(lock_fd);
+                   wifi_semaphore_destroy(lock_fd);
+               }
+#endif
                 wifi_unload_driver();
                 return -1;
             }
@@ -257,6 +479,13 @@ int wifi_load_driver()
         usleep(200000);
     }
     property_set(DRIVER_PROP_NAME, "timeout");
+#ifdef WIFI_BT_STATUS_SYNC
+    if (wifi_chip_qca) {
+        property_set(SERVICE_PROP_NAME, "");
+        wifi_semaphore_release(lock_fd);
+        wifi_semaphore_destroy(lock_fd);
+    }
+#endif
     wifi_unload_driver();
     return -1;
 #else
@@ -267,8 +496,35 @@ int wifi_load_driver()
 
 int wifi_unload_driver()
 {
+#ifdef WIFI_BT_STATUS_SYNC
+    int lock_fd = -1;
+    char bt_status[PROPERTY_VALUE_MAX];
+    int wifi_chip_qca = 0;
+#endif
     usleep(200000); /* allow to finish interface down */
 #ifdef WIFI_DRIVER_MODULE_PATH
+
+#ifdef WIFI_BT_STATUS_SYNC
+    wifi_chip_qca = is_wifi_qca();
+
+    if (wifi_chip_qca) {
+        lock_fd = wifi_semaphore_create();
+        wifi_semaphore_get(lock_fd);
+
+        wifi_wait_for_service_done("wlan_unloading");
+
+        property_get(BT_PROP_NAME, bt_status, NULL);
+
+        /* If BT is loaded */
+        if (strcmp(bt_status, "true") == 0) {
+            wifi_change_bt_satus(1);
+        }
+        else {
+            wifi_change_bt_satus(0);
+        }
+    }
+#endif
+
     if (rmmod(DRIVER_MODULE_NAME) == 0) {
         int count = 20; /* wait at most 10 seconds for completion */
         while (count-- > 0) {
@@ -278,11 +534,33 @@ int wifi_unload_driver()
         }
         usleep(500000); /* allow card removal */
         if (count) {
+#ifdef WIFI_BT_STATUS_SYNC
+            if (wifi_chip_qca) {
+                property_set(SERVICE_PROP_NAME, "");
+                wifi_semaphore_release(lock_fd);
+                wifi_semaphore_destroy(lock_fd);
+            }
+#endif
             return 0;
         }
+#ifdef WIFI_BT_STATUS_SYNC
+        if (wifi_chip_qca) {
+            property_set(SERVICE_PROP_NAME, "");
+            wifi_semaphore_release(lock_fd);
+            wifi_semaphore_destroy(lock_fd);
+        }
+#endif
         return -1;
-    } else
+    } else {
+#ifdef WIFI_BT_STATUS_SYNC
+        if (wifi_chip_qca) {
+            property_set(SERVICE_PROP_NAME, "");
+            wifi_semaphore_release(lock_fd);
+            wifi_semaphore_destroy(lock_fd);
+        }
+#endif
         return -1;
+    }
 #else
     property_set(DRIVER_PROP_NAME, "unloaded");
     return 0;
