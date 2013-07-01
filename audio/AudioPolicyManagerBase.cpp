@@ -2552,7 +2552,7 @@ const AudioPolicyManagerBase::VolumeCurvePoint
 
 const AudioPolicyManagerBase::VolumeCurvePoint
     AudioPolicyManagerBase::sSpeakerMediaVolumeCurve[AudioPolicyManagerBase::VOLCNT] = {
-    {1, -20.0f}, {20, -12.0f}, {60, -6.0f}, {100, 0.0f}
+    {1, -36.0f}, {20, -22.0f}, {60, -10.0f}, {100, 0.0f}
 };
 
 const AudioPolicyManagerBase::VolumeCurvePoint
