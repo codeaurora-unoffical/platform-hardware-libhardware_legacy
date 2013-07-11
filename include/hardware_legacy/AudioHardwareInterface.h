@@ -350,7 +350,9 @@ public:
                                 uint32_t channels=0,
                                 uint32_t sampleRate=0,
                                 uint32_t audioSource=0,
-                                status_t *status=0) {return NULL;};
+                                status_t *status=0,
+                                cb_func_ptr cb=NULL,
+                                void* private_data=NULL) {return NULL;};
     virtual    void        closeBroadcastStream(AudioBroadcastStream* out) {};
     /** This method creates and opens the audio hardware input stream */
     virtual AudioStreamIn* openInputStream(
