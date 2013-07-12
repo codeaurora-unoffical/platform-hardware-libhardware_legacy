@@ -86,6 +86,7 @@ public:
         DTMF             = 8,
         TTS              = 9,
         FM               = 10,
+        INCALL_MUSIC     = 11,
         NUM_STREAM_TYPES
     };
 
