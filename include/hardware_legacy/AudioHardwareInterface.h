@@ -196,6 +196,12 @@ public:
     /** dump the state of the audio output device */
     virtual status_t dump(int fd, const Vector<String16>& args) = 0;
 
+/* pause audio output device */
+virtual status_t    pause() = 0;
+
+/* resume audio output device from pause */
+virtual status_t    resume() = 0;
+
     // set/get audio output parameters. The function accepts a list of parameters
     // key value pairs in the form: key1=value1;key2=value2;...
     // Some keys are reserved for standard parameters (See AudioParameter class).
