@@ -128,12 +128,6 @@ status_t AudioPolicyCompatClient::setStreamVolume(
                                           volume, output, delayMs);
 }
 
-status_t AudioPolicyCompatClient::setFmVolume(float volume,
-                                              int delayMs)
-{
-    return mServiceOps->set_fm_volume(mService, volume, delayMs);
-}
-
 status_t AudioPolicyCompatClient::startTone(ToneGenerator::tone_type tone,
                                        AudioSystem::stream_type stream)
 {
