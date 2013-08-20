@@ -495,7 +495,7 @@ AudioPolicyManagerBase::IOProfile *AudioPolicyManagerBase::getProfileForDirectOu
            IOProfile *profile = mHwModules[i]->mOutputProfiles[j];
            if (profile->isCompatibleProfile(device, samplingRate, format,
                                            channelMask,
-                                          (audio_output_flags_t)(flags|AUDIO_OUTPUT_FLAG_DIRECT))) {
+                                           AUDIO_OUTPUT_FLAG_DIRECT)) {
                if (mAvailableOutputDevices & profile->mSupportedDevices) {
                    return mHwModules[i]->mOutputProfiles[j];
                }
@@ -1666,17 +1666,13 @@ status_t AudioPolicyManagerBase::checkOutputsForDevice(audio_devices_t device,
             ALOGV("opening output for device %08x", device);
             desc = new AudioOutputDescriptor(profile);
             desc->mDevice = device;
-            audio_io_handle_t output = 0;
-            if (!(desc->mFlags & AUDIO_OUTPUT_FLAG_LPA || desc->mFlags & AUDIO_OUTPUT_FLAG_TUNNEL ||
-                desc->mFlags & AUDIO_OUTPUT_FLAG_VOIP_RX)) {
-                output =  mpClientInterface->openOutput(profile->mModule->mHandle,
-                                                        &desc->mDevice,
-                                                        &desc->mSamplingRate,
-                                                        &desc->mFormat,
-                                                        &desc->mChannelMask,
-                                                        &desc->mLatency,
-                                                        desc->mFlags);
-            }
+            audio_io_handle_t output = mpClientInterface->openOutput(profile->mModule->mHandle,
+                                                                       &desc->mDevice,
+                                                                       &desc->mSamplingRate,
+                                                                       &desc->mFormat,
+                                                                       &desc->mChannelMask,
+                                                                       &desc->mLatency,
+                                                                       desc->mFlags);
             if (output != 0) {
                 if (desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
                     String8 reply;
@@ -2022,7 +2018,6 @@ audio_devices_t AudioPolicyManagerBase::getNewDevice(audio_io_handle_t output, b
     audio_devices_t device = AUDIO_DEVICE_NONE;
 
     AudioOutputDescriptor *outputDesc = mOutputs.valueFor(output);
-    AudioOutputDescriptor *primaryOutputDesc = mOutputs.valueFor(mPrimaryOutput);
     // check the following by order of priority to request a routing change if necessary:
     // 1: the strategy enforced audible is active on the output:
     //      use device for strategy enforced audible
@@ -2041,8 +2036,7 @@ audio_devices_t AudioPolicyManagerBase::getNewDevice(audio_io_handle_t output, b
     } else if (isInCall() ||
                     outputDesc->isStrategyActive(STRATEGY_PHONE)) {
         device = getDeviceForStrategy(STRATEGY_PHONE, fromCache);
-    } else if (outputDesc->isStrategyActive(STRATEGY_SONIFICATION) ||
-               (primaryOutputDesc->isStrategyActive(STRATEGY_SONIFICATION))) {
+    } else if (outputDesc->isStrategyActive(STRATEGY_SONIFICATION)) {
         device = getDeviceForStrategy(STRATEGY_SONIFICATION, fromCache);
     } else if (outputDesc->isStrategyActive(STRATEGY_SONIFICATION_RESPECTFUL)) {
         device = getDeviceForStrategy(STRATEGY_SONIFICATION_RESPECTFUL, fromCache);
@@ -2095,7 +2089,7 @@ AudioPolicyManagerBase::routing_strategy AudioPolicyManagerBase::getStrategy(
         // while key clicks are played produces a poor result
     case AudioSystem::TTS:
     case AudioSystem::MUSIC:
-    case AudioSystem::FM:
+    case AudioSystem::INCALL_MUSIC:
         return STRATEGY_MEDIA;
     case AudioSystem::ENFORCED_AUDIBLE:
         return STRATEGY_ENFORCED_AUDIBLE;
@@ -2596,7 +2590,6 @@ AudioPolicyManagerBase::device_category AudioPolicyManagerBase::getDeviceCategor
         case AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET:
         case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
         case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
-        case AUDIO_DEVICE_OUT_FM:
             return DEVICE_CATEGORY_HEADSET;
         case AUDIO_DEVICE_OUT_SPEAKER:
         case AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT:
@@ -2753,12 +2746,11 @@ const AudioPolicyManagerBase::VolumeCurvePoint
         sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EARPIECE
     },
-    { // AUDIO_STREAM_FM
+    { // AUDIO_STREAM_INCALL_MUSIC
         sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_HEADSET
         sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EARPIECE
     },
-
 };
 
 void AudioPolicyManagerBase::initializeVolumeCurves()
@@ -3483,6 +3475,7 @@ const struct StringToEnum sFlagNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_VOIP_RX),
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_LPA),
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_TUNNEL),
+    STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_INCALL_MUSIC),
 };
 
 const struct StringToEnum sFormatNameToEnumTable[] = {
@@ -3523,11 +3516,11 @@ const struct StringToEnum sOutChannelsNameToEnumTable[] = {
 const struct StringToEnum sInChannelsNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_CHANNEL_IN_MONO),
     STRING_TO_ENUM(AUDIO_CHANNEL_IN_STEREO),
+    STRING_TO_ENUM(AUDIO_CHANNEL_IN_FRONT_BACK),
     STRING_TO_ENUM(AUDIO_CHANNEL_IN_5POINT1),
     STRING_TO_ENUM(AUDIO_CHANNEL_IN_VOICE_CALL_MONO),
     STRING_TO_ENUM(AUDIO_CHANNEL_IN_VOICE_DNLINK_MONO),
     STRING_TO_ENUM(AUDIO_CHANNEL_IN_VOICE_UPLINK_MONO),
-    STRING_TO_ENUM(AUDIO_CHANNEL_IN_FRONT_BACK),
 };
 
 
