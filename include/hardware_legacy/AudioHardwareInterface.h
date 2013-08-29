@@ -354,6 +354,7 @@ public:
                                 int sessionId=-1,
                                 uint32_t samplingRate = 0,
                                 uint32_t channels = 0) {return 0;};
+    virtual    void        closeOutputSession(AudioStreamOut* out) {return;};
     virtual    void        closeOutputStream(AudioStreamOut* out) = 0;
     /** This method creates and opens the audio hardware output stream */
     virtual AudioBroadcastStream* openBroadcastStream(
