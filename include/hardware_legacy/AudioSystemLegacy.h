@@ -70,6 +70,22 @@ enum audio_source {
     AUDIO_SOURCE_LIST_END  // must be last - used to validate audio source type
 };
 
+#ifdef QCOM_MPQ_BROADCAST
+enum qcom_audio_source {
+    QCOM_AUDIO_SOURCE_DEFAULT                       = 0x100,
+    QCOM_AUDIO_SOURCE_DIGITAL_BROADCAST_MAIN_AD     = 0x101,
+    QCOM_AUDIO_SOURCE_DIGITAL_BROADCAST_MAIN_ONLY   = 0x104,
+    QCOM_AUDIO_SOURCE_ANALOG_BROADCAST              = 0x102,
+    QCOM_AUDIO_SOURCE_HDMI_IN                       = 0x103,
+};
+
+enum qcom_broadcast_audio_format {
+    QCOM_BROADCAST_AUDIO_FORMAT_LPCM                = 0x200,
+    QCOM_BROADCAST_AUDIO_FORMAT_COMPRESSED          = 0x201,
+    QCOM_BROADCAST_AUDIO_FORMAT_COMPRESSED_HBR      = 0x202
+};
+#endif
+
 class AudioSystem {
 public:
 #if 1
@@ -138,6 +154,15 @@ public:
         HE_AAC_V1           = 0x05000000,
         HE_AAC_V2           = 0x06000000,
         VORBIS              = 0x07000000,
+        EVRC                = 0x08000000,
+        QCELP               = 0x09000000,
+        AC3                 = 0x0a000000,
+        AC3_PLUS            = 0x0b000000,
+        DTS                 = 0x0c000000,
+        WMA                 = 0x0d000000,
+        EVRCB               = 0x10000000,
+        EVRCWB              = 0x11000000,
+        EAC3                = 0x12000000,
         MAIN_FORMAT_MASK    = 0xFF000000,
         SUB_FORMAT_MASK     = 0x00FFFFFF,
         // Aliases
@@ -204,12 +229,21 @@ public:
         CHANNEL_IN_Z_AXIS = 0x2000,
         CHANNEL_IN_VOICE_UPLINK = 0x4000,
         CHANNEL_IN_VOICE_DNLINK = 0x8000,
+        CHANNEL_IN_FRONT_LEFT  = 0x10000,
+        CHANNEL_IN_FRONT_RIGHT = 0x20000,
+        CHANNEL_IN_FRONT_CENTER = 0x40000,
+        CHANNEL_IN_LOW_FREQUENCY = 0x80000,
+        CHANNEL_IN_BACK_LEFT = 0x100000,
+        CHANNEL_IN_BACK_RIGHT = 0x200000,
         CHANNEL_IN_MONO = CHANNEL_IN_FRONT,
         CHANNEL_IN_STEREO = (CHANNEL_IN_LEFT | CHANNEL_IN_RIGHT),
+        CHANNEL_IN_5POINT1 = (CHANNEL_IN_FRONT_LEFT | CHANNEL_IN_FRONT_RIGHT |
+                CHANNEL_IN_FRONT_CENTER | CHANNEL_IN_LOW_FREQUENCY |
+                CHANNEL_IN_BACK_LEFT | CHANNEL_IN_BACK_RIGHT),
         CHANNEL_IN_ALL = (CHANNEL_IN_LEFT | CHANNEL_IN_RIGHT | CHANNEL_IN_FRONT | CHANNEL_IN_BACK|
                 CHANNEL_IN_LEFT_PROCESSED | CHANNEL_IN_RIGHT_PROCESSED | CHANNEL_IN_FRONT_PROCESSED | CHANNEL_IN_BACK_PROCESSED|
                 CHANNEL_IN_PRESSURE | CHANNEL_IN_X_AXIS | CHANNEL_IN_Y_AXIS | CHANNEL_IN_Z_AXIS |
-                CHANNEL_IN_VOICE_UPLINK | CHANNEL_IN_VOICE_DNLINK)
+                CHANNEL_IN_VOICE_UPLINK | CHANNEL_IN_VOICE_DNLINK | CHANNEL_IN_5POINT1)
     };
 
     enum audio_mode {
@@ -250,6 +284,7 @@ public:
         DEVICE_OUT_DGTL_DOCK_HEADSET = 0x1000,
         DEVICE_OUT_USB_ACCESSORY = 0x2000,
         DEVICE_OUT_USB_DEVICE = 0x4000,
+        DEVICE_OUT_SPDIF = 0x4001,
         DEVICE_OUT_FM = 0x8000,
         DEVICE_OUT_FM_TX = 0x10000,
         DEVICE_OUT_ANC_HEADSET = 0x20000,
@@ -264,7 +299,7 @@ public:
                 DEVICE_OUT_USB_ACCESSORY | DEVICE_OUT_USB_DEVICE |
                 DEVICE_OUT_ANC_HEADSET | DEVICE_OUT_ANC_HEADPHONE |
                 DEVICE_OUT_FM | DEVICE_OUT_FM_TX |
-                DEVICE_OUT_PROXY | DEVICE_OUT_DEFAULT),
+                DEVICE_OUT_PROXY | DEVICE_OUT_SPDIF | DEVICE_OUT_DEFAULT),
         DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP | DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
                 DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER),
         DEVICE_OUT_ALL_USB = (DEVICE_OUT_USB_ACCESSORY | DEVICE_OUT_USB_DEVICE),
