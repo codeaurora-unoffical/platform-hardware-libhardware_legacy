@@ -39,6 +39,9 @@ endif
 ifneq ($(strip $(AUDIO_FEATURE_DISABLED_INCALL_MUSIC)),true)
 LOCAL_CFLAGS += -DAUDIO_EXTN_INCALL_MUSIC_ENABLED
 endif
+ifneq ($(strip $(AUDIO_FEATURE_DISABLED_FORMATS)),true)
+LOCAL_CFLAGS += -DAUDIO_EXTN_FORMATS_ENABLED
+endif
 
 LOCAL_STATIC_LIBRARIES := libmedia_helper
 LOCAL_MODULE := libaudiopolicy_legacy
