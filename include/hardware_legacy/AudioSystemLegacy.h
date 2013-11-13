@@ -88,7 +88,6 @@ enum qcom_broadcast_audio_format {
 
 class AudioSystem {
 public:
-#if 1
     enum stream_type {
         DEFAULT          =-1,
         VOICE_CALL       = 0,
@@ -102,6 +101,7 @@ public:
         DTMF             = 8,
         TTS              = 9,
         INCALL_MUSIC     = 10,
+        FM               = 11,
         NUM_STREAM_TYPES
     };
 
@@ -375,13 +375,10 @@ public:
         NUM_DEVICE_STATES
     };
 
-#endif
-
     static uint32_t popCount(uint32_t u) {
         return popcount(u);
     }
 
-#if 1
     static bool isOutputDevice(audio_devices device) {
         if ((popcount(device) == 1) && ((device & ~DEVICE_OUT_ALL) == 0))
              return true;
@@ -416,7 +413,6 @@ public:
         return audio_is_input_channel(channel);
     }
 
-#endif
 };
 
 };  // namespace android
