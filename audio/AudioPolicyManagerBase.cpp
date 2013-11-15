@@ -2342,7 +2342,8 @@ uint32_t AudioPolicyManagerBase::checkDeviceMuteStrategies(AudioOutputDescriptor
                     (AudioSystem::popCount(device) >= 2);
     // temporary mute output if device selection changes to avoid volume bursts due to
     // different per device volumes
-    bool tempMute = (outputDesc->refCount() != 0) && (device != prevDevice);
+    bool tempMute = (outputDesc->refCount() != 0) && (device != prevDevice)
+                    && (prevDevice != AUDIO_DEVICE_NONE);
 
     for (size_t i = 0; i < NUM_STRATEGIES; i++) {
         audio_devices_t curDevice = getDeviceForStrategy((routing_strategy)i, false /*fromCache*/);
@@ -2359,7 +2360,8 @@ uint32_t AudioPolicyManagerBase::checkDeviceMuteStrategies(AudioOutputDescriptor
         if (doMute || tempMute) {
             for (size_t j = 0; j < mOutputs.size(); j++) {
                 AudioOutputDescriptor *desc = mOutputs.valueAt(j);
-                if ((desc->supportedDevices() & outputDesc->supportedDevices())
+                // check only active devices
+                if ((desc->device() & outputDesc->device())
                         == AUDIO_DEVICE_NONE) {
                     continue;
                 }
