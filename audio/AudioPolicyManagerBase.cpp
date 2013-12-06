@@ -587,27 +587,7 @@ audio_io_handle_t AudioPolicyManagerBase::getOutput(AudioSystem::stream_type str
     }
 
     if (profile != NULL) {
-        AudioOutputDescriptor *outputDesc = NULL;
-
-        for (size_t i = 0; i < mOutputs.size(); i++) {
-            AudioOutputDescriptor *desc = mOutputs.valueAt(i);
-            if (!desc->isDuplicated() && (profile == desc->mProfile)) {
-                outputDesc = desc;
-                // reuse direct output if currently open and configured with same parameters
-                if ((samplingRate == outputDesc->mSamplingRate) &&
-                        (format == outputDesc->mFormat) &&
-                        (channelMask == outputDesc->mChannelMask)) {
-                    outputDesc->mDirectOpenCount++;
-                    ALOGV("getOutput() reusing direct output %d", output);
-                    return mOutputs.keyAt(i);
-                }
-            }
-        }
-        // close direct output if currently open and configured with different parameters
-        if (outputDesc != NULL) {
-            closeOutput(outputDesc->mId);
-        }
-        outputDesc = new AudioOutputDescriptor(profile);
+        AudioOutputDescriptor *outputDesc = new AudioOutputDescriptor(profile);
         outputDesc->mDevice = device;
         outputDesc->mSamplingRate = samplingRate;
         outputDesc->mFormat = (audio_format_t)format;
