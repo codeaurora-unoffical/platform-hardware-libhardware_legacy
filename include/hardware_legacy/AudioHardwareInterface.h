@@ -205,6 +205,11 @@ public:
     // The audio flinger will put the output in standby and then change the parameter value.
     virtual status_t    setParameters(const String8& keyValuePairs) = 0;
     virtual String8     getParameters(const String8& keys) = 0;
+    virtual status_t    setAvsyncWindow(int windowId, int ws_msw, int ws_lsw, int we_msw, int we_lsw) = 0;
+    virtual status_t    getAvsyncSessionTime(int *session_msw, int *session_lsw, int *absolute_msw, int *absolute_lsw) = 0;
+    virtual status_t    getAvsyncInstStatistics(audio_avsync_statistics_t *st) = 0;
+    virtual status_t    getAvsyncCumuStatistics(audio_avsync_statistics_t *st) = 0;
+
 };
 
 /**
