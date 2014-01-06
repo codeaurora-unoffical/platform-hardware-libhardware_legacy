@@ -3569,6 +3569,7 @@ const struct StringToEnum sFlagNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_LPA),
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_TUNNEL),
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_INCALL_MUSIC),
+    STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_NU_DIRECT),
 };
 
 const struct StringToEnum sFormatNameToEnumTable[] = {
