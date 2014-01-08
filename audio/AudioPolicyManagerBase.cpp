@@ -1501,13 +1501,20 @@ bool AudioPolicyManagerBase::isOffloadSupported(const audio_offload_info_t& offl
                ALOGW("offload disabled by av.offload.enable = %s ", propValue );
                return false;
             }
+        } else {
+            return false;
         }
-        if(offloadInfo.is_streaming &&
-           property_get("av.streaming.offload.enable", propValue, NULL)) {
-            bool prop_enabled = atoi(propValue) || !strncmp("true", propValue, 4);
-            if (!prop_enabled) {
-               ALOGW("offload disabled by av.streaming.offload.enable = %s ", propValue );
-               return false;
+
+        if(offloadInfo.is_streaming) {
+            if (property_get("av.streaming.offload.enable", propValue, NULL)) {
+                bool prop_enabled = atoi(propValue) || !strncmp("true", propValue, 4);
+                if (!prop_enabled) {
+                   ALOGW("offload disabled by av.streaming.offload.enable = %s ", propValue );
+                   return false;
+                }
+            } else {
+                //Do not offload AV streamnig if the property is not defined
+                return false;
             }
         }
         ALOGV("isOffloadSupported: has_video == true, property\
