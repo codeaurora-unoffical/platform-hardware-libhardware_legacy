@@ -114,6 +114,9 @@ static char supplicant_name[PROPERTY_VALUE_MAX];
 /* Is either SUPP_PROP_NAME or P2P_PROP_NAME */
 static char supplicant_prop_name[PROPERTY_KEY_MAX];
 
+static const char DRIVER_PATH_PROP[] = "wlan.driver.name";
+static const char SUPP_CONFIG_TEMPLATE_PROP[] = "wlan.supp.template";
+
 static int insmod(const char *filename, const char *args)
 {
     void *module;
@@ -213,14 +216,23 @@ int wifi_load_driver()
 {
 #ifdef WIFI_DRIVER_MODULE_PATH
     char driver_status[PROPERTY_VALUE_MAX];
+    char module_path[PROPERTY_VALUE_MAX];
     int count = 100; /* wait at most 20 seconds for completion */
 
     if (is_wifi_driver_loaded()) {
         return 0;
     }
 
-    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
-        return -1;
+    property_get(DRIVER_PATH_PROP, module_path, NULL);
+
+    if (strcmp(module_path, "") == 0) {
+        if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
+            return -1;
+    }
+    else {
+        if (insmod(module_path, DRIVER_MODULE_ARG) < 0)
+            return -1;
+    }
 
     if (strcmp(FIRMWARE_LOADER,"") == 0) {
         /* usleep(WIFI_DRIVER_LOADER_DELAY); */
@@ -399,6 +411,8 @@ int update_ctrl_interface(const char *config_file) {
 int ensure_config_file_exists(const char *config_file)
 {
     char buf[2048];
+    char supp_template_conf[PROPERTY_VALUE_MAX];
+    const char *config_template;
     int srcfd, destfd;
     struct stat sb;
     int nread;
@@ -424,9 +438,17 @@ int ensure_config_file_exists(const char *config_file)
         return -1;
     }
 
-    srcfd = TEMP_FAILURE_RETRY(open(SUPP_CONFIG_TEMPLATE, O_RDONLY));
+    property_get(SUPP_CONFIG_TEMPLATE_PROP, supp_template_conf, NULL);
+
+    if (strcmp(supp_template_conf, "") == 0)
+        config_template = SUPP_CONFIG_TEMPLATE;
+    else
+        config_template = supp_template_conf;
+
+    srcfd = TEMP_FAILURE_RETRY(open(config_template, O_RDONLY));
+
     if (srcfd < 0) {
-        ALOGE("Cannot open \"%s\": %s", SUPP_CONFIG_TEMPLATE, strerror(errno));
+        ALOGE("Cannot open \"%s\": %s", config_template, strerror(errno));
         return -1;
     }
 
