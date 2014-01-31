@@ -2852,9 +2852,8 @@ uint32_t AudioPolicyManagerBase::setOutputDevice(audio_io_handle_t output,
 
     ALOGV("setOutputDevice() prevDevice %04x", prevDevice);
 
-    if (device != AUDIO_DEVICE_NONE) {
-        outputDesc->mDevice = device;
-    }
+    outputDesc->mDevice = device;
+
     muteWaitMs = checkDeviceMuteStrategies(outputDesc, prevDevice, delayMs);
 
     // Do not change the routing if:
