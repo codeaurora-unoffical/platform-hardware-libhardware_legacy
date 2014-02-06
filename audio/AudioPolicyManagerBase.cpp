@@ -20,7 +20,7 @@
  * code that are surrounded by "DOLBY..." are copyrighted and
  * licensed separately, as follows:
  *
- *  (C) 2011-2013 Dolby Laboratories, Inc.
+ *  (C) 2011-2014 Dolby Laboratories, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1317,14 +1317,12 @@ audio_io_handle_t AudioPolicyManagerBase::selectOutputForEffects(
     for (size_t i = 0; i < outputs.size(); i++) {
         AudioOutputDescriptor *desc = mOutputs.valueFor(outputs[i]);
         ALOGV("selectOutputForEffects outputs[%d] flags %x", i, desc->mFlags);
-#ifndef DOLBY_DAP_OPENSLES   // LINE_ADDED_BY_DOLBY
         if ((desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
             outputOffloaded = outputs[i];
         }
         if ((desc->mFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
             outputDeepBuffer = outputs[i];
         }
-#endif  // LINE_ADDED_BY_DOLBY
     }
 
     ALOGV("selectOutputForEffects outputOffloaded %d outputDeepBuffer %d",
