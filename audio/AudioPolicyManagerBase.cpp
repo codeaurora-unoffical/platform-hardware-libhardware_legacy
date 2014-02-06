@@ -20,7 +20,7 @@
  * code that are surrounded by "DOLBY..." are copyrighted and
  * licensed separately, as follows:
  *
- *  (C) 2011-2013 Dolby Laboratories, Inc.
+ *  (C) 2011-2014 Dolby Laboratories, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -494,6 +494,15 @@ void AudioPolicyManagerBase::setPhoneState(int state)
 
     // change routing is necessary
     setOutputDevice(mPrimaryOutput, newDevice, force, delayMs);
+
+    //update device for all non-primary outputs
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        audio_io_handle_t output = mOutputs.keyAt(i);
+        if (output != mPrimaryOutput) {
+            newDevice = getNewDevice(output, false /*fromCache*/);
+            setOutputDevice(output, newDevice, (newDevice != AUDIO_DEVICE_NONE));
+        }
+    }
 
     // if entering in call state, handle special case of active streams
     // pertaining to sonification strategy see handleIncallSonification()
@@ -1308,14 +1317,12 @@ audio_io_handle_t AudioPolicyManagerBase::selectOutputForEffects(
     for (size_t i = 0; i < outputs.size(); i++) {
         AudioOutputDescriptor *desc = mOutputs.valueFor(outputs[i]);
         ALOGV("selectOutputForEffects outputs[%d] flags %x", i, desc->mFlags);
-#ifndef DOLBY_DAP_OPENSLES   // LINE_ADDED_BY_DOLBY
         if ((desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
             outputOffloaded = outputs[i];
         }
         if ((desc->mFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
             outputDeepBuffer = outputs[i];
         }
-#endif  // LINE_ADDED_BY_DOLBY
     }
 
     ALOGV("selectOutputForEffects outputOffloaded %d outputDeepBuffer %d",
@@ -2318,7 +2325,7 @@ void AudioPolicyManagerBase::checkOutputForStrategy(routing_strategy strategy)
 {
     audio_devices_t oldDevice = getDeviceForStrategy(strategy, true /*fromCache*/);
     audio_devices_t newDevice = getDeviceForStrategy(strategy, false /*fromCache*/);
-    SortedVector<audio_io_handle_t> srcOutputs = getOutputsForDevice(oldDevice, mPreviousOutputs);
+    SortedVector<audio_io_handle_t> srcOutputs = getOutputsForDevice(oldDevice, mOutputs);
     SortedVector<audio_io_handle_t> dstOutputs = getOutputsForDevice(newDevice, mOutputs);
 
     if (!vectorsEqual(srcOutputs,dstOutputs)) {
@@ -2852,7 +2859,12 @@ uint32_t AudioPolicyManagerBase::setOutputDevice(audio_io_handle_t output,
 
     ALOGV("setOutputDevice() prevDevice %04x", prevDevice);
 
-    if (device != AUDIO_DEVICE_NONE) {
+    // Device Routing has not been triggered in the following scenario:
+    // Start playback on HDMI, pause it, unplug and plug HDMI cable, resume
+    // playback, music starts on speaker. To avoid this, update mDevice even
+    // if device is 0 which triggers routing when HDMI cable is reconnected
+    if (device != AUDIO_DEVICE_NONE ||
+        prevDevice == AUDIO_DEVICE_OUT_AUX_DIGITAL) {
         outputDesc->mDevice = device;
     }
     muteWaitMs = checkDeviceMuteStrategies(outputDesc, prevDevice, delayMs);
