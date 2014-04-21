@@ -1625,6 +1625,13 @@ bool AudioPolicyManagerBase::isOffloadSupported(const audio_offload_info_t& offl
         return false;
     }
 
+    //check if it's multi-channel AAC format
+    if (AudioSystem::popCount(offloadInfo.channel_mask) > 2
+            && offloadInfo.format == AUDIO_FORMAT_AAC) {
+        ALOGV("offload disabled for multi-channel AAC format");
+        return false;
+    }
+
     // Check if stream type is music, then only allow offload as of now.
     if (offloadInfo.stream_type != AUDIO_STREAM_MUSIC)
     {
