@@ -1347,6 +1347,7 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
     //Check if HDMI is the primary interface
     //In that case we need to route audio to HDMI
     bool hdmi_as_primary = false;
+    char hdmi_mode = 0; //DVI
     const char* file = "/sys/class/graphics/fb0/hdmi_primary";
     FILE* fp = fopen(file, "r");
     if(fp) {
@@ -1355,7 +1356,16 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
         fclose(fp);
     }
 
-    if(hdmi_as_primary) {
+    const char* file_mode = "/sys/class/graphics/fb0/hdmi_mode";
+    fp = fopen(file_mode, "r");
+    if(fp) {
+        fread(&hdmi_mode, sizeof(hdmi_mode), 1, fp);
+        hdmi_mode -= '0';
+        ALOGD("%s: HDMI mode %d", __FUNCTION__, hdmi_mode);
+        fclose(fp);
+    }
+
+    if(hdmi_as_primary && hdmi_mode) {
         // If HDMI is used as primary then all audio should always be
         // routed to HDMI by default. The connection can be assumed to
         // be always ON. Overrideable by Bluetooth.
