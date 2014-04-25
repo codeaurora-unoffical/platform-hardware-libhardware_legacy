@@ -1429,12 +1429,20 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
                     if (mPrimaryOutput == 0 &&
                             outProfile->mFlags & AUDIO_OUTPUT_FLAG_PRIMARY) {
                         mPrimaryOutput = output;
+                        addOutput(output, outputDesc);
+                        setOutputDevice(output,
+                                (audio_devices_t)(mDefaultOutputDevice &
+                                    outProfile->mSupportedDevices),
+                                true);
+                        if(is_mpq)
+                            startOutput(mPrimaryOutput, AudioSystem::SYSTEM, 0);
+                    } else {
+                        addOutput(output, outputDesc);
+                        setOutputDevice(output,
+                                (audio_devices_t)(mDefaultOutputDevice &
+                                    outProfile->mSupportedDevices),
+                                true);
                     }
-                    addOutput(output, outputDesc);
-                    setOutputDevice(output,
-                                    (audio_devices_t)(mDefaultOutputDevice &
-                                                        outProfile->mSupportedDevices),
-                                    true);
                 }
             }
         }
