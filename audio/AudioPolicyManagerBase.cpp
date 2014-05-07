@@ -2833,6 +2833,9 @@ uint32_t AudioPolicyManagerBase::checkDeviceMuteStrategies(AudioOutputDescriptor
     // wait for the PCM output buffers to empty before proceeding with the rest of the command
     if (muteWaitMs > delayMs) {
         muteWaitMs -= delayMs;
+        if(outputDesc->mDevice == AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET) {
+           muteWaitMs = muteWaitMs+10;
+        }
         usleep(muteWaitMs * 1000);
         return muteWaitMs;
     }
@@ -3965,6 +3968,7 @@ const struct StringToEnum sFormatNameToEnumTable[] = {
     STRING_TO_ENUM(AUDIO_FORMAT_QCELP),
     STRING_TO_ENUM(AUDIO_FORMAT_MP2),
     STRING_TO_ENUM(AUDIO_FORMAT_EVRCNW),
+    STRING_TO_ENUM(AUDIO_FORMAT_FLAC),
     STRING_TO_ENUM(AUDIO_FORMAT_PCM_16_BIT_OFFLOAD),
     STRING_TO_ENUM(AUDIO_FORMAT_PCM_24_BIT_OFFLOAD),
 #endif
