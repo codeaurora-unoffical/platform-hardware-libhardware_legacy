@@ -12,6 +12,25 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * This file was modified by Dolby Laboratories, Inc. The portions of the
+ * code that are surrounded by "DOLBY..." are copyrighted and
+ * licensed separately, as follows:
+ *
+ *  (C) 2011-2014 Dolby Laboratories, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  */
 
 #define LOG_TAG "AudioPolicyManagerBase"
@@ -38,14 +57,15 @@
 #include <math.h>
 #include <hardware_legacy/audio_policy_conf.h>
 #include <cutils/properties.h>
+#if defined(DOLBY_UDC) || defined(DOLBY_DAP_MOVE_EFFECT)
+#include "DolbyAudioPolicy_impl.h"
+#endif // DOLBY_END
 
 namespace android_audio_legacy {
 
 // ----------------------------------------------------------------------------
 // AudioPolicyInterface implementation
 // ----------------------------------------------------------------------------
-
-
 status_t AudioPolicyManagerBase::setDeviceConnectionState(audio_devices_t device,
                                                   AudioSystem::device_connection_state state,
                                                   const char *device_address)
@@ -174,6 +194,11 @@ status_t AudioPolicyManagerBase::setDeviceConnectionState(audio_devices_t device
         }
 
         updateDevicesAndOutputs();
+#ifdef DOLBY_UDC
+        // Before closing the opened outputs, update endpoint property with device capabilities
+        audio_devices_t audioOutputDevice = getDeviceForStrategy(getStrategy(AudioSystem::MUSIC), true);
+        mDolbyAudioPolicy.setEndpointSystemProperty(audioOutputDevice, mHwModules);
+#endif // DOLBY_END
         for (size_t i = 0; i < mOutputs.size(); i++) {
             // do not force device change on duplicated output because if device is 0, it will
             // also force a device 0 for the two outputs it is duplicated to which may override
@@ -657,7 +682,19 @@ audio_io_handle_t AudioPolicyManagerBase::getOutput(AudioSystem::stream_type str
         addOutput(output, outputDesc);
         audio_io_handle_t dstOutput = getOutputForEffect();
         if (dstOutput == output) {
+#ifdef DOLBY_DAP_MOVE_EFFECT
+            status_t status = mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, srcOutput, dstOutput);
+            if (status == NO_ERROR) {
+                for (size_t i = 0; i < mEffects.size(); i++) {
+                    EffectDescriptor *desc = mEffects.editValueAt(i);
+                    // update the mIo member variable of EffectDescriptor
+                    ALOGV("%s updating mIo", __FUNCTION__);
+                    desc->mIo = dstOutput;
+                }
+            }
+#else // DOLBY_END
             mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, srcOutput, dstOutput);
+#endif
         }
         mPreviousOutputs = mOutputs;
         ALOGV("getOutput() returns new direct output %d", output);
@@ -794,6 +831,25 @@ status_t AudioPolicyManagerBase::startOutput(audio_io_handle_t output,
             usleep((waitMs - muteWaitMs) * 2 * 1000);
         }
     }
+#ifdef DOLBY_UDC
+    // It is observed that in some use-cases where multiple outputs are present eg. bluetooth and headphone,
+    // the output for particular stream type is decided in this routine. Hence we must call
+    // getDeviceForStrategy in order to get the current active output for this stream type and update
+    // the dolby system property.
+    if (stream == AudioSystem::MUSIC)
+    {
+        audio_devices_t audioOutputDevice = getDeviceForStrategy(getStrategy(AudioSystem::MUSIC), true);
+        mDolbyAudioPolicy.setEndpointSystemProperty(audioOutputDevice, mHwModules);
+    }
+#endif // DOLBY_UDC
+#ifdef DOLBY_DAP_MOVE_EFFECT
+    if ((stream == AudioSystem::MUSIC) && mDolbyAudioPolicy.shouldMoveToOutput(output, outputDesc->mFlags)) {
+        status_t status = mpClientInterface->moveEffects(DOLBY_MOVE_EFFECT_SIGNAL, mDolbyAudioPolicy.output(), output);
+        if (status == NO_ERROR) {
+            mDolbyAudioPolicy.movedToOutput(output);
+        }
+    }
+#endif //DOLBY_END
     return NO_ERROR;
 }
 
@@ -848,6 +904,36 @@ status_t AudioPolicyManagerBase::stopOutput(audio_io_handle_t output,
             // update the outputs if stopping one with a stream that can affect notification routing
             handleNotificationRoutingForStream(stream);
         }
+#ifdef DOLBY_DAP_MOVE_EFFECT
+        // If all music tracks on current output are stopped and DAP effect is attached
+        // to this output then move DAP effect to output with active music tracks.
+        if ((stream == AudioSystem::MUSIC) && (outputDesc->mRefCount[AudioSystem::MUSIC] == 0) &&
+            mDolbyAudioPolicy.isAttachedToOutput(output)) {
+            // Find the first eligible output with active MUSIC track.
+            audio_io_handle_t moveOutput = (audio_io_handle_t)0;
+            for (size_t i = 0; i < mOutputs.size(); ++i) {
+                audio_io_handle_t curOutput = mOutputs.keyAt(i);
+                AudioOutputDescriptor *desc = mOutputs.valueAt(i);
+                if ((desc->mRefCount[AudioSystem::MUSIC] != 0) &&
+                    mDolbyAudioPolicy.shouldMoveToOutput(curOutput, desc->mFlags)) {
+                    moveOutput = curOutput;
+                    break;
+                }
+            }
+            // If no music streams are active then use the output for current strategy
+            if (moveOutput == (audio_io_handle_t)0) {
+                moveOutput = getOutputForEffect();
+            }
+            // Move the effect to new output
+            if (output != moveOutput) {
+                ALOGV("StopOutput(): moving effect from output %d to %d", output, moveOutput);
+                status_t status = mpClientInterface->moveEffects(DOLBY_MOVE_EFFECT_SIGNAL, output, moveOutput);
+                if (status == NO_ERROR) {
+                    mDolbyAudioPolicy.movedToOutput(moveOutput);
+                }
+            }
+        }
+#endif //DOLBY_END
         return NO_ERROR;
     } else {
         ALOGW("stopOutput() refcount is already 0 for output %d", output);
@@ -891,7 +977,21 @@ void AudioPolicyManagerBase::releaseOutput(audio_io_handle_t output)
             // output by default: move them back to the appropriate output.
             audio_io_handle_t dstOutput = getOutputForEffect();
             if (dstOutput != mPrimaryOutput) {
+#ifdef DOLBY_DAP_MOVE_EFFECT
+                status_t status = mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, mPrimaryOutput, dstOutput);
+                if (status == NO_ERROR) {
+                    for (size_t i = 0; i < mEffects.size(); i++) {
+                        EffectDescriptor *desc = mEffects.editValueAt(i);
+                        if (desc->mSession == AUDIO_SESSION_OUTPUT_MIX) {
+                            // update the mIo member variable of EffectDescriptor
+                            ALOGV("%s updating mIo", __FUNCTION__);
+                            desc->mIo = dstOutput;
+                        }
+                    }
+                }
+#else // DOLBY_END
                 mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, mPrimaryOutput, dstOutput);
+#endif
             }
         }
     }
@@ -1239,6 +1339,9 @@ status_t AudioPolicyManagerBase::registerEffect(const effect_descriptor_t *desc,
     pDesc->mEnabled = false;
 
     mEffects.add(id, pDesc);
+#ifdef DOLBY_DAP_MOVE_EFFECT
+    mDolbyAudioPolicy.effectRegistered(pDesc);
+#endif // DOLBY_END
 
     return NO_ERROR;
 }
@@ -1265,6 +1368,9 @@ status_t AudioPolicyManagerBase::unregisterEffect(int id)
             pDesc->mDesc.name, id, pDesc->mDesc.memoryUsage, mTotalEffectsMemory);
 
     mEffects.removeItem(id);
+#ifdef DOLBY_DAP_MOVE_EFFECT
+    mDolbyAudioPolicy.effectRemoved(pDesc);
+#endif // DOLBY_END
     delete pDesc;
 
     return NO_ERROR;
@@ -2129,8 +2235,17 @@ void AudioPolicyManagerBase::checkOutputForStrategy(routing_strategy strategy)
                     if (moved.indexOf(desc->mIo) < 0) {
                         ALOGV("checkOutputForStrategy() moving effect %d to output %d",
                               mEffects.keyAt(i), fxOutput);
+#ifdef DOLBY_DAP_MOVE_EFFECT
+                        status_t status = mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, desc->mIo,
+                                                       fxOutput);
+                        if (status != NO_ERROR) {
+                            ALOGV("%s moveEffects from %d to %d failed", __FUNCTION__, desc->mIo, fxOutput);
+                            continue;
+                        }
+#else // DOLBY_END
                         mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, desc->mIo,
                                                        fxOutput);
+#endif
                         moved.add(desc->mIo);
                     }
                     desc->mIo = fxOutput;
