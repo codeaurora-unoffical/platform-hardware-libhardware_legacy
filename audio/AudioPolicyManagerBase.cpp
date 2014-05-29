@@ -1266,7 +1266,13 @@ status_t AudioPolicyManagerBase::setStreamVolumeIndex(AudioSystem::stream_type s
     for (size_t i = 0; i < mOutputs.size(); i++) {
         audio_devices_t curDevice =
                 getDeviceForVolume(mOutputs.valueAt(i)->device());
+#ifdef AUDIO_EXTN_FM_ENABLED
+        if (((device == AUDIO_DEVICE_OUT_DEFAULT) &&
+              (mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM != AUDIO_DEVICE_OUT_FM)) ||
+              (device == curDevice)) {
+#else
         if ((device == AUDIO_DEVICE_OUT_DEFAULT) || (device == curDevice)) {
+#endif
             status_t volStatus = checkAndSetVolume(stream, index, mOutputs.keyAt(i), curDevice);
             if (volStatus != NO_ERROR) {
                 status = volStatus;
