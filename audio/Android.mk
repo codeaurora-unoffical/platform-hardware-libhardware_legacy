@@ -77,6 +77,10 @@ ifdef DOLBY_DAP
     endif
 endif #DOLBY_END
 
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_HDMI_PASSTHROUGH)),true)
+    LOCAL_CFLAGS += -DAUDIO_EXTN_HDMI_PASSTHROUGH_ENABLED
+endif
+
 LOCAL_STATIC_LIBRARIES := libmedia_helper
 LOCAL_MODULE := libaudiopolicy_legacy
 LOCAL_MODULE_TAGS := optional
