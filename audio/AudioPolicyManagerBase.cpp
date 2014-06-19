@@ -928,36 +928,6 @@ status_t AudioPolicyManagerBase::stopOutput(audio_io_handle_t output,
             // update the outputs if stopping one with a stream that can affect notification routing
             handleNotificationRoutingForStream(stream);
         }
-#ifdef DOLBY_DAP_MOVE_EFFECT
-        // If all music tracks on current output are stopped and DAP effect is attached
-        // to this output then move DAP effect to output with active music tracks.
-        if ((stream == AudioSystem::MUSIC) && (outputDesc->mRefCount[AudioSystem::MUSIC] == 0) &&
-            mDolbyAudioPolicy.isAttachedToOutput(output)) {
-            // Find the first eligible output with active MUSIC track.
-            audio_io_handle_t moveOutput = (audio_io_handle_t)0;
-            for (size_t i = 0; i < mOutputs.size(); ++i) {
-                audio_io_handle_t curOutput = mOutputs.keyAt(i);
-                AudioOutputDescriptor *desc = mOutputs.valueAt(i);
-                if ((desc->mRefCount[AudioSystem::MUSIC] != 0) &&
-                    mDolbyAudioPolicy.shouldMoveToOutput(curOutput, desc->mFlags)) {
-                    moveOutput = curOutput;
-                    break;
-                }
-            }
-            // If no music streams are active then use the output for current strategy
-            if (moveOutput == (audio_io_handle_t)0) {
-                moveOutput = getOutputForEffect();
-            }
-            // Move the effect to new output
-            if (output != moveOutput) {
-                ALOGV("StopOutput(): moving effect from output %d to %d", output, moveOutput);
-                status_t status = mpClientInterface->moveEffects(DOLBY_MOVE_EFFECT_SIGNAL, output, moveOutput);
-                if (status == NO_ERROR) {
-                    mDolbyAudioPolicy.movedToOutput(moveOutput);
-                }
-            }
-        }
-#endif //DOLBY_END
         return NO_ERROR;
     } else {
         ALOGW("stopOutput() refcount is already 0 for output %d", output);
