@@ -551,7 +551,7 @@ AudioPolicyManagerBase::IOProfile *AudioPolicyManagerBase::getProfileForDirectOu
             if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
                 if (profile->isCompatibleProfile(device, samplingRate, format,
                                            channelMask,
-                                           AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)) {
+                                           flags)) {
                     if (mAvailableOutputDevices & profile->mSupportedDevices) {
                         return mHwModules[i]->mOutputProfiles[j];
                     }
@@ -1295,7 +1295,11 @@ audio_io_handle_t AudioPolicyManagerBase::selectOutputForEffects(
     for (size_t i = 0; i < outputs.size(); i++) {
         AudioOutputDescriptor *desc = mOutputs.valueFor(outputs[i]);
         ALOGV("selectOutputForEffects outputs[%d] flags %x", i, desc->mFlags);
-        if ((desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
+        if (((desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0)
+#ifdef AUDIO_EXTN_HDMI_PASSTHROUGH_ENABLED
+            && ((desc->mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_PASSTHROUGH) == 0)
+#endif
+            ) {
             outputOffloaded = outputs[i];
         }
         if ((desc->mFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
@@ -3762,6 +3766,19 @@ bool AudioPolicyManagerBase::IOProfile::isCompatibleProfile(audio_devices_t devi
      }
      if ((mFlags & flags) != flags) {
          return false;
+#ifdef AUDIO_EXTN_HDMI_PASSTHROUGH_ENABLED
+     } else {
+          // Work around to check for passthrough output support.
+          // We are using same flags as compress offload with addition
+          // of passthrough flag. So we need to have an additional check
+          // if the input flags has passthrough
+          if (mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_PASSTHROUGH) {
+              if ((flags & AUDIO_OUTPUT_FLAG_COMPRESS_PASSTHROUGH) == 0) {
+                  ALOGV("isCompatibleProfile:flags not equal, Not passthrough");
+                  return false;
+              }
+         }
+#endif
      }
      size_t i;
      for (i = 0; i < mSamplingRates.size(); i++)
@@ -3891,6 +3908,9 @@ const struct StringToEnum sFlagNameToEnumTable[] = {
 #endif
 #ifdef AUDIO_EXTN_COMPRESS_VOIP_ENABLED
     STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_VOIP_RX),
+#endif
+#ifdef AUDIO_EXTN_HDMI_PASSTHROUGH_ENABLED
+    STRING_TO_ENUM(AUDIO_OUTPUT_FLAG_COMPRESS_PASSTHROUGH),
 #endif
 };
 
