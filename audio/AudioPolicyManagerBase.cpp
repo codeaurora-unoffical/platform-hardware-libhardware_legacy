@@ -706,15 +706,19 @@ audio_io_handle_t AudioPolicyManagerBase::getOutput(AudioSystem::stream_type str
         addOutput(output, outputDesc);
         audio_io_handle_t dstOutput = getOutputForEffect();
         if (dstOutput == output) {
-#ifdef DOLBY_DAP_MOVE_EFFECT
+#ifdef DOLBY_DAP
             status_t status = mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, srcOutput, dstOutput);
             if (status == NO_ERROR) {
                 for (size_t i = 0; i < mEffects.size(); i++) {
                     EffectDescriptor *desc = mEffects.editValueAt(i);
-                    // update the mIo member variable of EffectDescriptor
-                    ALOGV("%s updating mIo", __FUNCTION__);
-                    desc->mIo = dstOutput;
+                    if (desc->mSession == AUDIO_SESSION_OUTPUT_MIX) {
+                        // update the mIo member of EffectDescriptor for the global effect
+                        ALOGV("%s updating mIo", __FUNCTION__);
+                        desc->mIo = dstOutput;
+                    }
                 }
+            } else {
+                ALOGW("%s moveEffects from %d to %d failed", __FUNCTION__, srcOutput, dstOutput);
             }
 #else // DOLBY_END
             mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, srcOutput, dstOutput);
@@ -971,17 +975,19 @@ void AudioPolicyManagerBase::releaseOutput(audio_io_handle_t output)
             // output by default: move them back to the appropriate output.
             audio_io_handle_t dstOutput = getOutputForEffect();
             if (dstOutput != mPrimaryOutput) {
-#ifdef DOLBY_DAP_MOVE_EFFECT
+#ifdef DOLBY_DAP
                 status_t status = mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, mPrimaryOutput, dstOutput);
                 if (status == NO_ERROR) {
                     for (size_t i = 0; i < mEffects.size(); i++) {
                         EffectDescriptor *desc = mEffects.editValueAt(i);
                         if (desc->mSession == AUDIO_SESSION_OUTPUT_MIX) {
-                            // update the mIo member variable of EffectDescriptor
+                            // update the mIo member of EffectDescriptor for the global effect
                             ALOGV("%s updating mIo", __FUNCTION__);
                             desc->mIo = dstOutput;
                         }
                     }
+                } else {
+                    ALOGW("%s moveEffects from %d to %d failed", __FUNCTION__, mPrimaryOutput, dstOutput);
                 }
 #else // DOLBY_END
                 mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, mPrimaryOutput, dstOutput);
@@ -2261,11 +2267,11 @@ void AudioPolicyManagerBase::checkOutputForStrategy(routing_strategy strategy)
                     if (moved.indexOf(desc->mIo) < 0) {
                         ALOGV("checkOutputForStrategy() moving effect %d to output %d",
                               mEffects.keyAt(i), fxOutput);
-#ifdef DOLBY_DAP_MOVE_EFFECT
+#ifdef DOLBY_DAP
                         status_t status = mpClientInterface->moveEffects(AUDIO_SESSION_OUTPUT_MIX, desc->mIo,
                                                        fxOutput);
                         if (status != NO_ERROR) {
-                            ALOGV("%s moveEffects from %d to %d failed", __FUNCTION__, desc->mIo, fxOutput);
+                            ALOGW("%s moveEffects from %d to %d failed", __FUNCTION__, desc->mIo, fxOutput);
                             continue;
                         }
 #else // DOLBY_END
