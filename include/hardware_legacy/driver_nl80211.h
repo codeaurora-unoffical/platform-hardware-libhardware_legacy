@@ -169,7 +169,7 @@ struct wpa_driver_nl80211_data {
 	struct wpa_driver_scan_filter *filter_ssids;
 	size_t num_filter_ssids;
 
-	struct i802_bss first_bss;
+	struct i802_bss *first_bss;
 
 	int eapol_tx_sock;
 
