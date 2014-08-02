@@ -348,6 +348,12 @@ int update_ctrl_interface(const char *config_file) {
         return 0;
     }
 
+    if(nread < sb.st_size)
+      pbuf[nread]='\0';
+    else
+      pbuf[sb.st_size]='\0';
+    ALOGD("value read from %s file is %s", config_file, pbuf);
+
     if (!strcmp(config_file, SUPP_CONFIG_FILE)) {
         property_get("wifi.interface", ifc, WIFI_TEST_INTERFACE);
     } else {
