@@ -1251,6 +1251,13 @@ status_t AudioPolicyManagerBase::setStreamVolumeIndex(AudioSystem::stream_type s
     // Force max volume if stream cannot be muted
     if (!mStreams[stream].mCanBeMuted) index = mStreams[stream].mIndexMax;
 
+    char propValue[PROPERTY_VALUE_MAX];
+    if (stream == AudioSystem::ENFORCED_AUDIBLE) {
+        property_get("persist.audio.camera.vol.fixed", propValue, "0");
+        if (atoi(propValue) != 0)
+            index -=4;
+    }
+
     ALOGV("setStreamVolumeIndex() stream %d, device %04x, index %d",
           stream, device, index);
 
