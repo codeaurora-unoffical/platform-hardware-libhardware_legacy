@@ -2483,7 +2483,8 @@ audio_devices_t AudioPolicyManagerBase::getNewDevice(audio_io_handle_t output, b
     } else if (outputDesc->isStrategyActive(STRATEGY_SONIFICATION)||
                 (primaryOutputDesc->isStrategyActive(STRATEGY_SONIFICATION)&& !primaryOutputDesc->isStrategyActive(STRATEGY_MEDIA))){
         device = getDeviceForStrategy(STRATEGY_SONIFICATION, fromCache);
-    } else if (outputDesc->isStrategyActive(STRATEGY_SONIFICATION_RESPECTFUL)) {
+    } else if (outputDesc->isStrategyActive(STRATEGY_SONIFICATION_RESPECTFUL) ||
+                (primaryOutputDesc->isStrategyActive(STRATEGY_SONIFICATION_RESPECTFUL) && !primaryOutputDesc->isStrategyActive(STRATEGY_MEDIA))) {
         device = getDeviceForStrategy(STRATEGY_SONIFICATION_RESPECTFUL, fromCache);
     } else if (outputDesc->isStrategyActive(STRATEGY_MEDIA)) {
         device = getDeviceForStrategy(STRATEGY_MEDIA, fromCache);
