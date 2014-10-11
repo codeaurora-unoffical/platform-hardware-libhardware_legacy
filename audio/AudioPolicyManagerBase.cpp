@@ -1266,7 +1266,7 @@ status_t AudioPolicyManagerBase::setStreamVolumeIndex(AudioSystem::stream_type s
                 getDeviceForVolume(mOutputs.valueAt(i)->device());
 #ifdef AUDIO_EXTN_FM_ENABLED
         if (((device == AUDIO_DEVICE_OUT_DEFAULT) &&
-              (mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM != AUDIO_DEVICE_OUT_FM)) ||
+              ((mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM) != AUDIO_DEVICE_OUT_FM)) ||
               (device == curDevice)) {
 #else
         if ((device == AUDIO_DEVICE_OUT_DEFAULT) || (device == curDevice)) {
