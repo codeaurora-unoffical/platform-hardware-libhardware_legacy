@@ -687,6 +687,18 @@ int wifi_send_command(const char *cmd, char *reply, size_t *reply_len)
     return 0;
 }
 
+int wifi_supplicant_connection_active()
+{
+    char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
+
+    if (property_get(supplicant_prop_name, supp_status, NULL)) {
+        if (strcmp(supp_status, "stopped") == 0)
+            return -1;
+    }
+
+    return 0;
+}
+
 int wifi_ctrl_recv(char *reply, size_t *reply_len)
 {
     int res;
@@ -703,11 +715,21 @@ int wifi_ctrl_recv(char *reply, size_t *reply_len)
     rfds[0].events |= POLLIN;
     rfds[1].fd = exit_sockets[1];
     rfds[1].events |= POLLIN;
-    res = TEMP_FAILURE_RETRY(poll(rfds, 2, -1));
-    if (res < 0) {
-        ALOGE("Error poll = %d", res);
-        return res;
-    }
+    do {
+        res = TEMP_FAILURE_RETRY(poll(rfds, 2, 30000));
+        if (res < 0) {
+            ALOGE("Error poll = %d", res);
+            return res;
+        } else if (res == 0) {
+            /* timed out, check if supplicant is active
+             * or not ..
+             */
+            res = wifi_supplicant_connection_active();
+            if (res < 0)
+                return -2;
+        }
+    } while (res == 0);
+
     if (rfds[0].revents & POLLIN) {
         return wpa_ctrl_recv(monitor_conn, reply, reply_len);
     }
@@ -725,26 +747,30 @@ int wifi_wait_on_socket(char *buf, size_t buflen)
     char *match, *match2;
 
     if (monitor_conn == NULL) {
-        return snprintf(buf, buflen, WPA_EVENT_TERMINATING " - connection closed");
+        return snprintf(buf, buflen, "IFNAME=%s %s - connection closed",
+                        primary_iface, WPA_EVENT_TERMINATING);
     }
 
     result = wifi_ctrl_recv(buf, &nread);
 
     /* Terminate reception on exit socket */
     if (result == -2) {
-        return snprintf(buf, buflen, WPA_EVENT_TERMINATING " - connection closed");
+        return snprintf(buf, buflen, "IFNAME=%s %s - connection closed",
+                        primary_iface, WPA_EVENT_TERMINATING);
     }
 
     if (result < 0) {
         ALOGD("wifi_ctrl_recv failed: %s\n", strerror(errno));
-        return snprintf(buf, buflen, WPA_EVENT_TERMINATING " - recv error");
+        return snprintf(buf, buflen, "IFNAME=%s %s - recv error",
+                        primary_iface, WPA_EVENT_TERMINATING);
     }
     buf[nread] = '\0';
     /* Check for EOF on the socket */
     if (result == 0 && nread == 0) {
         /* Fabricate an event to pass up */
         ALOGD("Received EOF on supplicant socket\n");
-        return snprintf(buf, buflen, WPA_EVENT_TERMINATING " - signal 0 received");
+        return snprintf(buf, buflen, "IFNAME=%s %s - signal 0 received",
+                        primary_iface, WPA_EVENT_TERMINATING);
     }
     /*
      * Events strings are in the format
