@@ -2814,9 +2814,11 @@ uint32_t AudioPolicyManagerBase::checkDeviceMuteStrategies(AudioOutputDescriptor
                     continue;
                 }
                 audio_io_handle_t curOutput = mOutputs.keyAt(j);
-                ALOGVV("checkDeviceMuteStrategies() %s strategy %d (curDevice %04x) on output %d",
-                      mute ? "muting" : "unmuting", i, curDevice, curOutput);
-                setStrategyMute((routing_strategy)i, mute, curOutput, mute ? 0 : delayMs);
+                if (doMute) {
+                    ALOGVV("checkDeviceMuteStrategies() %s strategy %d (curDevice %04x) on output %d",
+                          mute ? "muting" : "unmuting", i, curDevice, curOutput);
+                    setStrategyMute((routing_strategy)i, mute, curOutput, mute ? 0 : delayMs);
+                }
                 if (desc->isStrategyActive((routing_strategy)i)) {
                     // do tempMute only for current output
                     if (tempMute && (desc == outputDesc)) {
