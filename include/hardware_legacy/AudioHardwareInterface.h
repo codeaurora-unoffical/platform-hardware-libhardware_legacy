@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -110,12 +112,23 @@ public:
     // return the number of audio frames written by the audio dsp to DAC since
     // the output has exited standby
     virtual status_t    getRenderPosition(uint32_t *dspFrames) = 0;
+    virtual status_t    getPresentationPosition(uint64_t *frames, struct timespec *timestamp) = 0;
 
     /**
      * get the local time at which the next write to the audio driver will be
      * presented
      */
     virtual status_t    getNextWriteTimestamp(int64_t *timestamp);
+    virtual status_t    start() {return INVALID_OPERATION;}
+    virtual status_t    pause()  {return INVALID_OPERATION;}
+    virtual status_t    flush()  {return INVALID_OPERATION;}
+    virtual status_t    stop()  {return INVALID_OPERATION;}
+    virtual int         setObserver(void *observer)  {return INVALID_OPERATION;}
+    virtual status_t    getBufferInfo(buf_info **buf) {return INVALID_OPERATION;}
+    virtual status_t    isBufferAvailable(int *isAvail) {
+        *isAvail = true;
+        return NO_ERROR;
+    }
 
 };
 
