@@ -58,6 +58,8 @@ typedef u32 NanDataPathId;
 #define NAN_MAX_FRAME_DATA_LEN                  504
 #define NAN_DP_MAX_APP_INFO_LEN                 512
 #define NAN_ERROR_STR_LEN                       255
+#define NAN_PMK_INFO_LEN                        32
+#define NAN_MAX_SCID_BUF_LEN                    1024
 
 /*
   Definition of various NanResponseType
@@ -113,6 +115,18 @@ typedef enum {
     NAN_EVENT_ID_JOINED_CLUSTER
 } NanDiscEngEventType;
 
+/* NAN Data Path type */
+typedef enum {
+    NAN_DATA_PATH_UNICAST_MSG = 0,
+    NAN_DATA_PATH_MULTICAST_MSG
+} NdpType;
+
+/* NAN Ranging Configuration */
+typedef enum {
+    NAN_RANGING_DISABLE = 0,
+    NAN_RANGING_ENABLE
+} NanRangingState;
+
 /* TCA Type */
 typedef enum {
     NAN_TCA_ID_CLUSTER_SIZE = 0
@@ -136,20 +150,18 @@ typedef enum {
     NAN_STATUS_INVALID_PARAM = 5,
     /*  if the requestor instance id is invalid */
     NAN_STATUS_INVALID_REQUESTOR_INSTANCE_ID = 6,
-    /*  if the service instance id is invalid */
-    NAN_STATUS_INVALID_SERVICE_INSTANCE_ID = 7,
     /*  if the ndp id is invalid */
-    NAN_STATUS_INVALID_NDP_ID = 8,
+    NAN_STATUS_INVALID_NDP_ID = 7,
     /* if NAN is enabled when wifi is turned off */
-    NAN_STATUS_NAN_NOT_ALLOWED = 9,
+    NAN_STATUS_NAN_NOT_ALLOWED = 8,
     /* if over the air ack is not received */
-    NAN_STATUS_NO_OTA_ACK = 10,
+    NAN_STATUS_NO_OTA_ACK = 9,
     /* If NAN is already enabled and we are try to re-enable the same */
-    NAN_STATUS_ALREADY_ENABLED = 11,
+    NAN_STATUS_ALREADY_ENABLED = 10,
     /* If followup message internal queue is full */
-    NAN_STATUS_FOLLOWUP_QUEUE_FULL = 12,
+    NAN_STATUS_FOLLOWUP_QUEUE_FULL = 11,
     /* Unsupported concurrency session enabled, NAN disabled notified */
-    NAN_STATUS_UNSUPPORTED_CONCURRENCY_NAN_DISABLED = 13
+    NAN_STATUS_UNSUPPORTED_CONCURRENCY_NAN_DISABLED = 12
 } NanStatusType;
 
 /* NAN Transmit Types */
@@ -220,6 +232,59 @@ typedef enum {
     NAN_DP_FORCE_CHANNEL_SETUP
 } NanDataPathChannelCfg;
 
+/* NAN Ranging Auto response configuration */
+typedef enum {
+    NAN_RANGING_AUTO_RESPONSE_ENABLE = 0,
+    NAN_RANGING_AUTO_RESPONSE_DISABLE
+} NanRangingAutoResponseCfg;
+
+/* NAN Shared Key Security Cipher Suites Mask */
+#define NAN_CIPHER_SUITE_SHARED_KEY_128_MASK  0x01
+#define NAN_CIPHER_SUITE_SHARED_KEY_256_MASK  0x02
+
+/* NAN ranging indication condition MASKS */
+#define NAN_RANGING_INDICATE_CONTINUOUS_MASK   0x01
+#define NAN_RANGING_INDICATE_INGRESS_MET_MASK  0x02
+#define NAN_RANGING_INDICATE_EGRESS_MET_MASK   0x04
+
+/*
+   Structure to set the Service Descriptor Extension
+   Attribute (SDEA) passed as part of NanPublishRequest/
+   NanSubscribeRequest/NanMatchInd.
+*/
+typedef struct {
+    /*
+       Optional configuration of Data Path Enable request.
+       configure flag determines whether configuration needs
+       to be passed or not.
+    */
+    u8 config_nan_data_path;
+    NdpType ndp_type;
+    /*
+       NAN secuirty required flag to indicate
+       if the security is enabled or disabled
+    */
+    NanDataPathSecurityCfgStatus security_cfg;
+    /*
+       NAN ranging required flag to indicate
+       if ranging is enabled on disabled
+    */
+    NanRangingState ranging_state;
+} NanSdeaCtrlParams;
+
+/*
+   Nan Ranging Result indicating structure
+*/
+typedef struct {
+    /*
+       Distance to the NAN device with the MAC address indicated
+       with ranged mac address.
+    */
+    u32 range_measurement_cm;
+    /* Ranging event matching the configuration of continuous/ingress/egress. */
+    u32 ranging_event_type;
+} NanRangeResult;
+
 /* Nan/NDP Capabilites info */
 typedef struct {
     u32 max_concurrent_nan_clusters;
@@ -235,7 +300,19 @@ typedef struct {
     u32 max_ndp_sessions;
     u32 max_app_info_len;
     u32 max_queued_transmit_followup_msgs;
+    u32 cipher_suites_supported;
 } NanCapabilities;
+
+/*
+  Nan accept policy: Per service basis policy
+  Based on this policy(ALL/NONE), responder side
+  will send ACCEPT/REJECT
+*/
+typedef enum {
+    /* Default value */
+    NAN_SERVICE_ACCEPT_POLICY_NONE = 0,
+    NAN_SERVICE_ACCEPT_POLICY_ALL
+} NanServiceAcceptPolicy;
 
 /*
   Host can send Vendor specific attributes which the Discovery Engine can
@@ -472,6 +549,30 @@ typedef enum {
     NAN_P2P_OPER_CLI = 4
 } NanDeviceRole;
 
+/* Configuration params of NAN Ranging */
+typedef struct {
+    /*
+      Interval in milli sec between two ranging measurements.
+      If the Awake DW intervals in NanEnable/Config are larger
+      than the ranging intervals priority is given to Awake DW
+      Intervals. Only on a match the ranging is initiated for the
+      peer
+    */
+    u32 ranging_interval_msec;
+    /*
+      Flags indicating the type of ranging event to be notified
+      NAN_RANGING_INDICATE_ MASKS are used to set these.
+      BIT0 - Continuous Ranging event notification.
+      BIT1 - Ingress distance is <=.
+      BIT2 - Egress distance is >=.
+    */
+    u32 config_ranging_indications;
+    /* Ingress distance in centimeters (optional) */
+    u32 distance_ingress_cm;
+    /* Egress distance in centimeters (optional) */
+    u32 distance_egress_cm;
+} NanRangingCfg;
+
 /* Structure of Post NAN Discovery attribute */
 typedef struct {
     /* Connection type of the host */
@@ -578,6 +679,31 @@ typedef struct {
     u16 infrastructure_ssid_len;
     u8 infrastructure_ssid_val[NAN_MAX_INFRA_DATA_LEN];
 } NanReceivePostDiscovery;
+
+/*
+   NAN device level configuration of SDF and Sync beacons in both
+   2.4/5GHz bands
+*/
+typedef struct {
+    /* Configure 2.4GHz DW Band */
+    u8 config_2dot4g_dw_band;
+    /*
+       Indicates the interval for Sync beacons and SDF's in 2.4GHz band.
+       Valid values of DW Interval are: 1, 2, 3, 4 and 5, 0 is reserved.
+       The SDF includes in OTA when enabled. The publish/subscribe period
+       values don't override the device level configurations.
+    */
+    u32 dw_2dot4g_interval_val;
+    /* Configure 5GHz DW Band */
+    u8 config_5g_dw_band;
+    /*
+       Indicates the interval for Sync beacons and SDF's in 5GHz band
+       Valid values of DW Interval are: 1, 2, 3, 4 and 5, 0 no wake up for
+       any interval. The SDF includes in OTA when enabled. The publish/subscribe
+       period values don't override the device level configurations.
+    */
+    u32 dw_5g_interval_val;
+} NanConfigDW;
 
 /*
   Enable Request Message Structure
@@ -739,6 +865,29 @@ typedef struct {
 
     u8 config_5g_channel;
     wifi_channel channel_5g_val;
+
+    /* Configure 2.4/5GHz DW */
+    NanConfigDW config_dw;
+
+    /*
+       By default discovery MAC address randomization is enabled
+       and default interval value is 30 minutes i.e. 1800 seconds.
+       The value 0 is used to disable MAC addr randomization.
+    */
+    u8 config_disc_mac_addr_randomization;
+    u32 disc_mac_addr_rand_interval_sec;
+
+    /* Enable NAN device Ranging response mode */
+    u8 config_responder_auto_response;
+    NanRangingAutoResponseCfg ranging_auto_response_cfg;
+
+    /*
+      Set/Enable corresponding bits to disable Discovery indications:
+      BIT0 - Disable Discovery MAC Address Event.
+      BIT1 - Disable Started Cluster Event.
+      BIT2 - Disable Joined Cluster Event.
+    */
+    u8 discovery_indication_cfg;
 } NanEnableRequest;
 
 /*
@@ -749,7 +898,15 @@ typedef struct {
 typedef struct {
     u16 publish_id;/* id  0 means new publish, any other id is existing publish */
     u16 ttl; /* how many seconds to run for. 0 means forever until canceled */
-    u16 period; /* periodicity of OTA unsolicited publish. Specified in increments of 500 ms */
+    /*
+       period: Awake DW Interval for publish(service)
+       Indicates the interval between two Discovery Windows in which
+       the device supporting the service is awake to transmit or
+       receive the Service Discovery frames.
+       Valid values of Awake DW Interval are: 1, 2, 4, 8 and 16, value 0 will
+       default to 1.
+    */
+    u16 period;
     NanPublishType publish_type;/* 0= unsolicited, solicited = 1, 2= both */
     NanTxType tx_type; /* 0 = broadcast, 1= unicast  if solicited publish */
     u8 publish_count; /* number of OTA Publish, 0 means forever until canceled */
@@ -817,6 +974,37 @@ typedef struct {
       BIT2 - Disable followUp indication received (OTA).
     */
     u8 recv_indication_cfg;
+    /*
+      Nan accept policy for the specific service(publish)
+    */
+    NanServiceAcceptPolicy service_responder_policy;
+    /* NAN Cipher Suite Type */
+    u32 cipher_type;
+    /* pmk length */
+    u8 pmk_len;
+    /*
+       PMK: Info is optional in Discovery phase. PMK info can be passed during
+       the NDP session.
+     */
+    u8 pmk[NAN_PMK_INFO_LEN];
+
+    /* Security Context Identifiers length */
+    u32 scid_len;
+    /*
+       Security Context Identifier attribute contains PMKID
+       shall be included in NDP setup and response messages.
+       Security Context Identifier, Identifies the Security
+       Context. For NAN Shared Key Cipher Suite, this field
+       contains the 16 octet PMKID identifying the PMK used
+       for setting up the Secure Data Path.
+    */
+    u8 scid[NAN_MAX_SCID_BUF_LEN];
+
+    /* NAN configure service discovery extended attributes */
+    NanSdeaCtrlParams sdea_params;
+
+    /* NAN Ranging configuration */
+    NanRangingCfg ranging_cfg;
 } NanPublishRequest;
 
 /*
@@ -836,7 +1024,15 @@ typedef struct {
 typedef struct {
     u16 subscribe_id; /* id 0 means new subscribe, non zero is existing subscribe */
     u16 ttl; /* how many seconds to run for. 0 means forever until canceled */
-    u16 period;/* periodicity of OTA Active Subscribe. Units in increments of 500 ms , 0 = attempt every DW*/
+    /*
+       period: Awake DW Interval for subscribe(service)
+       Indicates the interval between two Discovery Windows in which
+       the device supporting the service is awake to transmit or
+       receive the Service Discovery frames.
+       Valid values of Awake DW Interval are: 1, 2, 4, 8 and 16, value 0 will
+       default to 1.
+    */
+    u16 period;
 
     /* Flag which specifies how the Subscribe request shall be processed. */
     NanSubscribeType subscribe_type; /* 0 - PASSIVE , 1- ACTIVE */
@@ -929,6 +1125,34 @@ typedef struct {
       BIT2 - Disable followUp indication received (OTA).
     */
     u8 recv_indication_cfg;
+
+    /* NAN Cipher Suite Type */
+    u32 cipher_type;
+    /* pmk length */
+    u8 pmk_len;
+    /*
+       PMK: Info is optional in Discovery phase. PMK info can be passed during
+       the NDP session.
+    */
+    u8 pmk[NAN_PMK_INFO_LEN];
+
+    /* Security Context Identifiers length */
+    u32 scid_len;
+    /*
+       Security Context Identifier attribute contains PMKID
+       shall be included in NDP setup and response messages.
+       Security Context Identifier, Identifies the Security
+       Context. For NAN Shared Key Cipher Suite, this field
+       contains the 16 octet PMKID identifying the PMK used
+       for setting up the Secure Data Path.
+    */
+    u8 scid[NAN_MAX_SCID_BUF_LEN];
+
+    /* NAN configure service discovery extended attributes */
+    NanSdeaCtrlParams sdea_params;
+
+    /* NAN Ranging configuration */
+    NanRangingCfg ranging_cfg;
 } NanSubscribeRequest;
 
 /*
@@ -1048,6 +1272,26 @@ typedef struct {
     /* NAN Further availability Map */
     u8 config_fam;
     NanFurtherAvailabilityMap fam_val;
+    /* Configure 2.4/5GHz DW */
+    NanConfigDW config_dw;
+    /*
+       By default discovery MAC address randomization is enabled
+       and default interval value is 30 minutes i.e. 1800 seconds.
+       The value 0 is used to disable MAC addr randomization.
+    */
+    u8 config_disc_mac_addr_randomization;
+    u32 disc_mac_addr_rand_interval_sec;
+    /* Config NAN device Ranging response mode */
+    u8 config_responder_auto_response;
+    NanRangingAutoResponseCfg ranging_auto_response_cfg;
+
+    /*
+      Set/Enable corresponding bits to disable Discovery indications:
+      BIT0 - Disable Discovery MAC Address Event.
+      BIT1 - Disable Started Cluster Event.
+      BIT2 - Disable Joined Cluster Event.
+    */
+    u8 discovery_indication_cfg;
 } NanConfigRequest;
 
 /*
@@ -1237,6 +1481,7 @@ typedef struct
     u32 discBeaconTxAttempts;
     u32 discBeaconTxFailures;
     u32 amHopCountExpireCount;
+    u32 ndpChannelFreq;
 } NanSyncStats;
 
 /* NAN Misc DE Statistics */
@@ -1411,6 +1656,47 @@ typedef struct {
     /* NAN Cluster Attribute */
     u8 cluster_attribute_len;
     u8 cluster_attribute[NAN_MAX_CLUSTER_ATTRIBUTE_LEN];
+
+    /* NAN Cipher Suite */
+    u32 peer_cipher_type;
+
+    /* Security Context Identifiers length */
+    u32 scid_len;
+    /*
+       Security Context Identifier attribute contains PMKID
+       shall be included in NDP setup and response messages.
+       Security Context Identifier, Identifies the Security
+       Context. For NAN Shared Key Cipher Suite, this field
+       contains the 16 octet PMKID identifying the PMK used
+       for setting up the Secure Data Path.
+    */
+    u8 scid[NAN_MAX_SCID_BUF_LEN];
+
+    /* Peer service discovery extended attributes */
+    NanSdeaCtrlParams peer_sdea_params;
+
+    /*
+      Ranging indication and NanMatchAlg are not tied.
+      Ex: NanMatchAlg can indicate Match_ONCE, but ranging
+      indications can be continuous. All ranging indications
+      depend on SDEA control parameters of ranging required for
+      continuous, and ingress/egress values in the ranging config.
+      Ranging indication data is notified if:
+      1) Ranging required is enabled in SDEA.
+         range info notified continuous.
+      2) if range_limit ingress/egress MASKS are enabled
+         notify once for ingress >= ingress_distance
+         and egress <= egress_distance, same for ingress_egress_both
+      3) if the Awake DW intervals are higher than the ranging intervals,
+         priority is given to the device DW intervalsi.
+    */
+    /*
+      Range Result includes:
+      1) distance to the NAN device with the MAC address indicated
+         with ranged mac address.
+      2) Ranging event matching the configuration of continuous/ingress/egress.
+    */
+    NanRangeResult range_result;
 } NanMatchInd;
 
 /*
@@ -1625,7 +1911,7 @@ typedef struct {
      This is same as publish_id notified on the subscribe side
      in a publish/subscribe scenario
     */
-    u32 service_instance_id; /* Value 0 for no publish/subscribe */
+    u32 requestor_instance_id; /* Value 0 for no publish/subscribe */
 
     /* Config flag for channel request */
     NanDataPathChannelCfg channel_request_type;
@@ -1645,6 +1931,13 @@ typedef struct {
     NanDataPathCfg ndp_cfg;
     /* App/Service information of the Initiator */
     NanDataPathAppInfo app_info;
+
+    /* NAN Cipher Suite Type */
+    u32 cipher_type;
+    /* pmk length */
+    u8 pmk_len;
+    /* PMK */
+    u8 pmk[NAN_PMK_INFO_LEN];
 } NanDataPathInitiatorRequest;
 
 /*
@@ -1669,6 +1962,13 @@ typedef struct {
     NanDataPathAppInfo app_info;
     /* Response Code indicating ACCEPT/REJECT/DEFER */
     NanDataPathResponseCode rsp_code;
+
+    /* NAN Cipher Suite Type */
+    u32 cipher_type;
+    /* pmk length */
+    u8 pmk_len;
+    /* PMK */
+    u8 pmk[NAN_PMK_INFO_LEN];
 } NanDataPathIndicationResponse;
 
 /* NDP termination info */
@@ -2020,7 +2320,7 @@ wifi_error nan_data_interface_delete(transaction_id id,
  *                      NAN_STATUS_INVALID_PARAM
  *                      NAN_STATUS_INTERNAL_FAILURE
  *                      NAN_STATUS_PROTOCOL_FAILURE
- *                      NAN_STATUS_INVALID_SERVICE_INSTANCE_ID
+ *                      NAN_STATUS_INVALID_REQUESTOR_INSTANCE_ID
  */
 wifi_error nan_data_request_initiator(transaction_id id,
                                       wifi_interface_handle iface,
