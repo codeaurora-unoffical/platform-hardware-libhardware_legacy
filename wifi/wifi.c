@@ -287,7 +287,7 @@ int wifi_load_driver()
     property_set(DRIVER_PROP_NAME, "timeout");
     wifi_unload_driver();
     return -1;
-#else
+#endif
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
     if (is_wifi_driver_loaded()) {
         return 0;
@@ -298,7 +298,6 @@ int wifi_load_driver()
 #endif
     property_set(DRIVER_PROP_NAME, "ok");
     return 0;
-#endif
 }
 
 int wifi_unload_driver()
@@ -322,7 +321,7 @@ int wifi_unload_driver()
         return -1;
     } else
         return -1;
-#else
+#endif
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
     if (is_wifi_driver_loaded()) {
         if (wifi_change_driver_state(WIFI_DRIVER_STATE_OFF) < 0)
@@ -331,7 +330,6 @@ int wifi_unload_driver()
 #endif
     property_set(DRIVER_PROP_NAME, "unloaded");
     return 0;
-#endif
 }
 
 int ensure_entropy_file_exists()
