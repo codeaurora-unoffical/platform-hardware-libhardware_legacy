@@ -265,39 +265,19 @@ int wifi_load_driver()
     if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
         return -1;
 
-    if (strcmp(FIRMWARE_LOADER,"") == 0) {
-        /* usleep(WIFI_DRIVER_LOADER_DELAY); */
-        property_set(DRIVER_PROP_NAME, "ok");
-    }
-    else {
-        property_set("ctl.start", FIRMWARE_LOADER);
-    }
-    sched_yield();
-    while (count-- > 0) {
-        if (property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
-            if (strcmp(driver_status, "ok") == 0)
-                return wifi_fst_load_driver();
-            else if (strcmp(driver_status, "failed") == 0) {
-                wifi_unload_driver();
-                return -1;
-            }
-        }
-        usleep(200000);
-    }
-    property_set(DRIVER_PROP_NAME, "timeout");
-    wifi_unload_driver();
-    return -1;
 #endif
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
     if (is_wifi_driver_loaded()) {
-        return 0;
+        return wifi_fst_load_driver();
     }
 
-    if (wifi_change_driver_state(WIFI_DRIVER_STATE_ON) < 0)
+    if (wifi_change_driver_state(WIFI_DRIVER_STATE_ON) < 0) {
+        wifi_unload_driver();
         return -1;
+    }
 #endif
     property_set(DRIVER_PROP_NAME, "ok");
-    return 0;
+    return wifi_fst_load_driver();
 }
 
 int wifi_unload_driver()
