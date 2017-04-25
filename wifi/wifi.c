@@ -108,6 +108,14 @@ static const char DRIVER_MODULE_ARG[]   = WIFI_DRIVER_MODULE_ARG;
 #endif
 static const char FIRMWARE_LOADER[]     = WIFI_FIRMWARE_LOADER;
 static const char DRIVER_PROP_NAME[]    = "wlan.driver.status";
+/*
+ * Property to know if the Load Once Unload Never
+ * (insmod during init script) is supported.
+ * TODO : Temporary property to ensure that Wi-Fi does not break till
+ * all the dependent commits to enable Load Once Unload Never feature
+ * is enabled.
+ */
+static const char DRIVER_PROP_LOAD_TYPE[]    = "wlan.driver.load.type";
 static const char SUPPLICANT_NAME[]     = "wpa_supplicant";
 static const char SUPP_PROP_NAME[]      = "init.svc.wpa_supplicant";
 static const char P2P_SUPPLICANT_NAME[] = "p2p_supplicant";
@@ -254,8 +262,8 @@ int is_wifi_driver_loaded() {
 
 int wifi_load_driver()
 {
+    char wifi_driver_module_path = 0;
 #ifdef WIFI_DRIVER_MODULE_PATH
-    char driver_status[PROPERTY_VALUE_MAX];
     int count = 100; /* wait at most 20 seconds for completion */
 
     if (is_wifi_driver_loaded()) {
@@ -264,40 +272,29 @@ int wifi_load_driver()
 
     if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
         return -1;
+    wifi_driver_module_path = 1;
 
-    if (strcmp(FIRMWARE_LOADER,"") == 0) {
-        /* usleep(WIFI_DRIVER_LOADER_DELAY); */
-        property_set(DRIVER_PROP_NAME, "ok");
-    }
-    else {
-        property_set("ctl.start", FIRMWARE_LOADER);
-    }
-    sched_yield();
-    while (count-- > 0) {
-        if (property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
-            if (strcmp(driver_status, "ok") == 0)
-                return wifi_fst_load_driver();
-            else if (strcmp(driver_status, "failed") == 0) {
-                wifi_unload_driver();
-                return -1;
-            }
-        }
-        usleep(200000);
-    }
-    property_set(DRIVER_PROP_NAME, "timeout");
-    wifi_unload_driver();
-    return -1;
 #endif
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
-    if (is_wifi_driver_loaded()) {
-        return 0;
+    char driver_status[PROPERTY_VALUE_MAX];
+    static const char TEMP_DRIVER_MODULE_PATH[] = "/system/lib/modules/wlan.ko";
+    if (!wifi_driver_module_path &&
+        (!property_get(DRIVER_PROP_LOAD_TYPE, driver_status, NULL))) {
+        if (insmod(TEMP_DRIVER_MODULE_PATH, WIFI_DRIVER_MODULE_ARG) < 0)
+            return -1;
     }
 
-    if (wifi_change_driver_state(WIFI_DRIVER_STATE_ON) < 0)
+    if (is_wifi_driver_loaded()) {
+        return wifi_fst_load_driver();
+    }
+
+    if (wifi_change_driver_state(WIFI_DRIVER_STATE_ON) < 0) {
+        wifi_unload_driver();
         return -1;
+    }
 #endif
     property_set(DRIVER_PROP_NAME, "ok");
-    return 0;
+    return wifi_fst_load_driver();
 }
 
 int wifi_unload_driver()
@@ -323,6 +320,24 @@ int wifi_unload_driver()
         return -1;
 #endif
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
+    char driver_status[PROPERTY_VALUE_MAX];
+    static const char TEMP_DRIVER_MODULE_PATH[] = "/system/lib/modules/wlan.ko";
+    if ((!property_get(DRIVER_PROP_LOAD_TYPE, driver_status, NULL))) {
+        if (rmmod("wlan") == 0) {
+            int count = 20; /* wait at most 10 seconds for completion */
+            while (count-- > 0) {
+                if (!is_wifi_driver_loaded())
+                    break;
+                usleep(500000);
+            }
+            usleep(500000); /* allow card removal */
+            if (count) {
+                return 0;
+            }
+            return -1;
+        } else
+            return -1;
+    }
     if (is_wifi_driver_loaded()) {
         if (wifi_change_driver_state(WIFI_DRIVER_STATE_OFF) < 0)
             return -1;
