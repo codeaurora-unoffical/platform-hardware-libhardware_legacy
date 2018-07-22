@@ -41,6 +41,9 @@ wifi_error wifi_set_beacon_wifi_iface_stats_averaging_factor(wifi_request_id id,
 wifi_error wifi_set_guard_time(wifi_request_id id, wifi_interface_handle iface,
         u32 guard_time);
 
+// set restricted offchannel.
+wifi_error wifi_set_restricted_offchannel(wifi_interface_handle iface, const char* ifname, u8 enable);
+
 #ifdef __cplusplus
 }
 

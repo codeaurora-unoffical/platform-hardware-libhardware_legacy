@@ -412,6 +412,7 @@ typedef struct {
     wifi_error (*wifi_configure_roaming)(wifi_interface_handle handle,
                                          wifi_roaming_config *roaming_config);
     wifi_error (*wifi_set_qpower)(wifi_interface_handle iface, u8 powersave);
+    wifi_error (*wifi_set_restricted_offchannel)(wifi_interface_handle iface, const char* ifname, u8 enable);
 } wifi_hal_fn;
 wifi_error init_wifi_vendor_hal_func_table(wifi_hal_fn *fn);
 #ifdef __cplusplus
