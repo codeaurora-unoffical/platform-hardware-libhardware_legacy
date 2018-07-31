@@ -42,7 +42,7 @@ wifi_error wifi_set_guard_time(wifi_request_id id, wifi_interface_handle iface,
         u32 guard_time);
 
 // set restricted offchannel.
-wifi_error wifi_set_restricted_offchannel(wifi_interface_handle iface, u8 enable);
+wifi_error wifi_set_restricted_offchannel(wifi_interface_handle iface, const char* ifname, u8 enable);
 
 #ifdef __cplusplus
 }
