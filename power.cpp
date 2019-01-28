@@ -18,7 +18,6 @@
 #define ATRACE_TAG ATRACE_TAG_POWER
 
 #include <android-base/logging.h>
-#include <android/system/suspend/1.0/BpHwSystemSuspend.h>
 #include <android/system/suspend/1.0/ISystemSuspend.h>
 #include <hardware_legacy/power.h>
 #include <utils/Trace.h>
@@ -37,30 +36,7 @@ static std::mutex gLock;
 static std::unordered_map<std::string, sp<IWakeLock>> gWakeLockMap;
 
 static const sp<ISystemSuspend>& getSystemSuspendServiceOnce() {
-    using android::system::suspend::V1_0::BpHwSystemSuspend;
-    static std::once_flag initFlag;
-    static sp<ISystemSuspend> suspendService = nullptr;
-
-    // TODO(b/117575503): We use this buffer to make sure that suspendService pointer and the
-    // underlying memory are not corrupted before using it. Ideally, memory corruption should be
-    // fixed.
-    static constexpr size_t bufSize = sizeof(BpHwSystemSuspend);
-    static char buf[bufSize];
-
-    std::call_once(initFlag, []() {
-        // It's possible for the calling process to not have permissions to
-        // ISystemSuspend. getService will then return nullptr.
-        suspendService = ISystemSuspend::getService();
-        if (suspendService) {
-            std::memcpy(buf, static_cast<void*>(suspendService.get()), bufSize);
-        }
-    });
-    if (suspendService) {
-        if (std::memcmp(buf, static_cast<void*>(suspendService.get()), bufSize) != 0) {
-            LOG(FATAL) << "Memory corrupted. Aborting.";
-        }
-    }
-
+    static sp<ISystemSuspend> suspendService = ISystemSuspend::getService();
     return suspendService;
 }
 
@@ -73,7 +49,15 @@ int acquire_wake_lock(int, const char* id) {
 
     std::lock_guard<std::mutex> l{gLock};
     if (!gWakeLockMap[id]) {
-        gWakeLockMap[id] = suspendService->acquireWakeLock(WakeLockType::PARTIAL, id);
+        auto ret = suspendService->acquireWakeLock(WakeLockType::PARTIAL, id);
+        // It's possible that during device shutdown SystemSuspend service has already exited. In
+        // these situations HIDL calls to it will result in a DEAD_OBJECT transaction error. We
+        // check for DEAD_OBJECT so that libpower clients can shutdown cleanly.
+        if (ret.isDeadObject()) {
+            return -1;
+        } else {
+            gWakeLockMap[id] = ret;
+        }
     }
     return 0;
 }
