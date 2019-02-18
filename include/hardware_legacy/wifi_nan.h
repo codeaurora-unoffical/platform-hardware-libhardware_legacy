@@ -1510,6 +1510,8 @@ typedef struct {
     u32 enable_dw_termination;
     /*
        Indicate whether to use NDPE attribute to bring-up TCP/IP connection
+       If config_ndpe_attr is not configured, the default behavior is
+       not using NDPE attr, and the capability is not advertised.
        0 - Not use
        1 - Use
     */
