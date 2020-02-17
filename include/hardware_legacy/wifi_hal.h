@@ -528,9 +528,6 @@ typedef struct {
                                          wifi_roaming_config *roaming_config);
     wifi_error (*wifi_set_radio_mode_change_handler)(wifi_request_id id, wifi_interface_handle
                         iface, wifi_radio_mode_change_handler eh);
-    wifi_error (*wifi_add_or_remove_virtual_intf)(wifi_interface_handle iface,
-                                                  const char* ifname, u32 iface_type,
-                                                  bool create);
     wifi_error (*wifi_set_latency_mode)(wifi_interface_handle iface,
                                         wifi_latency_mode mode);
     wifi_error (*wifi_set_thermal_mitigation_mode)(wifi_handle handle,
