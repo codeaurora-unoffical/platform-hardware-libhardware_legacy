@@ -65,6 +65,14 @@ typedef enum {
   WIFI_MITIGATION_EMERGENCY = 5,
 } wifi_thermal_mode;
 
+/* List of interface types supported */
+typedef enum {
+  WIFI_INTERFACE_TYPE_STA = 0,
+  WIFI_INTERFACE_TYPE_AP  = 1,
+  WIFI_INTERFACE_TYPE_P2P = 2,
+  WIFI_INTERFACE_TYPE_NAN = 3,
+} wifi_interface_type;
+
 /*
  * enum wlan_mac_band - Band information corresponding to the WLAN MAC.
  */
@@ -520,14 +528,15 @@ typedef struct {
                                          wifi_roaming_config *roaming_config);
     wifi_error (*wifi_set_radio_mode_change_handler)(wifi_request_id id, wifi_interface_handle
                         iface, wifi_radio_mode_change_handler eh);
-    wifi_error (*wifi_add_or_remove_virtual_intf)(wifi_interface_handle iface,
-                                                  const char* ifname, u32 iface_type,
-                                                  bool create);
     wifi_error (*wifi_set_latency_mode)(wifi_interface_handle iface,
                                         wifi_latency_mode mode);
     wifi_error (*wifi_set_thermal_mitigation_mode)(wifi_handle handle,
                                                    wifi_thermal_mode mode,
                                                    u32 completion_window);
+
+    wifi_error (*wifi_virtual_interface_create)(wifi_handle handle, const char* ifname,
+                                                wifi_interface_type iface_type);
+    wifi_error (*wifi_virtual_interface_delete)(wifi_handle handle, const char* ifname);
 
 } wifi_hal_fn;
 wifi_error init_wifi_vendor_hal_func_table(wifi_hal_fn *fn);
