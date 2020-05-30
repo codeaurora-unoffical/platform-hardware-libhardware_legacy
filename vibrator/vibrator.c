@@ -21,55 +21,75 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define THE_DEVICE "/sys/class/timed_output/vibrator/enable"
+#define LED_DEVICE "/sys/class/leds/vibrator"
+#define TIMEOUT_STR_LEN         20
 
-int vibrator_exists()
+static int write_value(const char *file, const char *value)
 {
-    int fd;
+    int to_write, written, ret, fd;
 
-#ifdef QEMU_HARDWARE
-    if (qemu_check()) {
-        return 1;
+    fd = TEMP_FAILURE_RETRY(open(file, O_WRONLY));
+    if (fd < 0) {
+        return -errno;
     }
-#endif
 
-    fd = open(THE_DEVICE, O_RDWR);
-    if(fd < 0)
-        return 0;
+    to_write = strlen(value) + 1;
+    written = TEMP_FAILURE_RETRY(write(fd, value, to_write));
+    if (written == -1) {
+        ret = -errno;
+    } else if (written != to_write) {
+        /* even though EAGAIN is an errno value that could be set
+           by write() in some cases, none of them apply here.  So, this return
+           value can be clearly identified when debugging and suggests the
+           caller that it may try to call vibrator_on() again */
+        ret = -EAGAIN;
+    } else {
+        ret = 0;
+    }
+
+    errno = 0;
     close(fd);
-    return 1;
+
+    return ret;
 }
 
-static int sendit(int timeout_ms)
+static int write_led_file(const char *file, const char *value)
 {
-    int nwr, ret, fd;
-    char value[20];
+    char file_str[50];
 
-#ifdef QEMU_HARDWARE
-    if (qemu_check()) {
-        return qemu_control_command( "vibrator:%d", timeout_ms );
-    }
-#endif
+    snprintf(file_str, sizeof(file_str), "%s/%s", LED_DEVICE, file);
+    return write_value(file_str, value);
+}
 
-    fd = open(THE_DEVICE, O_RDWR);
-    if(fd < 0)
-        return errno;
+static int vibra_led_on(unsigned int timeout_ms)
+{
+    int ret;
+    char value[TIMEOUT_STR_LEN]; /* large enough for millions of years */
 
-    nwr = sprintf(value, "%d\n", timeout_ms);
-    ret = write(fd, value, nwr);
+    ret = write_led_file("state", "1");
+    if (ret)
+        return ret;
 
-    close(fd);
+    snprintf(value, sizeof(value), "%u\n", timeout_ms);
+    ret = write_led_file("duration", value);
+    if (ret)
+        return ret;
 
-    return (ret == nwr) ? 0 : -1;
+    return write_led_file("activate", "1");
+}
+
+static int vibra_led_off()
+{
+    return write_led_file("activate", "0");
 }
 
 int vibrator_on(int timeout_ms)
 {
     /* constant on, up to maximum allowed time */
-    return sendit(timeout_ms);
+    return vibra_led_on(timeout_ms);
 }
 
 int vibrator_off()
 {
-    return sendit(0);
+    return vibra_led_off();
 }
